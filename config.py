@@ -13,9 +13,17 @@ real scenario_metrics breakdowns.
 # --- Over-generality / clarification trigger (state.py, P1) ---
 CANDIDATE_POOL_TOO_LARGE = 50   # ask instead of guessing if more candidates than this survive retrieval
 MAX_CLARIFYING_TURNS = 4        # force a best-guess return after this many clarifying questions, well inside the 10-turn hard cap
-ATTRIBUTE_PRIORITY = [          # default order to ask about when several slots are still unknown
-    "category", "budget", "size", "color", "material",
-    "style", "brand", "use_case", "feature", "other",
+
+# Default order to ask about when several slots are still unknown.
+# "category" and "brand" are deliberately last resort: confirmed by reading
+# evaluator/local_evaluator.py that category is always disclosed for free
+# in turn 1 (initial_message()), and classify_constraint() never labels
+# anything "brand" — asking either is very likely a wasted turn against
+# MTTC, since the simulator has no mechanism to reward the question with
+# new information. See src/attributes.py's classify_constraint() docstring.
+ATTRIBUTE_PRIORITY = [
+    "budget", "size", "color", "material", "style", "use_case", "feature", "other",
+    "category", "brand",
 ]
 
 # --- Retrieval fusion (fusion_rerank.py, P3) ---
