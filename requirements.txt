@@ -2,6 +2,14 @@
 groq>=1.7.0
 python-dotenv>=1.0.0
 
+# The agent itself needs no third-party packages: retrieval runs on the
+# Python stdlib (sqlite3 FTS5) and everything stays in-memory. The two
+# above are only used by the optional LLM reranking stage, which is why
+# the offline fallback required by docs/submission_rules.md is viable.
+
+# Tests
+pytest>=8.0
+
 # Anticipated for dense retrieval (P3) — uncomment/pin once chosen & tested,
 # per TEAM_WORKFLOW.md: "everyone can append via PR"
 # sentence-transformers

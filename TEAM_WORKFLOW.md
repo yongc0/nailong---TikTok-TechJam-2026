@@ -6,21 +6,31 @@ untangling merge conflicts or waiting on each other.
 
 ## 1. Role split (mirrors PLAN.md's 5 systems + submission_rules.md's file layout)
 
-Restructure `starter/agent.py` into a package so each person owns files
-nobody else touches:
+The package below exists on `main`. ✅ = implemented and scoring,
+⬜ = still a stub raising `NotImplementedError`.
 
 ```
-agent.py                  # thin glue: imports + wires the 4 modules below
+agent.py                   ✅ thin glue: wires the pipeline, matches the contract
+config.py                  ✅ every tunable threshold and weight — tune here, not in code
 src/
-  state.py                # P1 — slots, Intent Override, Boundary handling
-  intent.py                # P1 — Buying/Browsing router
-  retrieval_filter.py      # P2 — structured/attribute-match retrieval (Route A)
-  retrieval_dense.py       # P3 — embeddings + candidate retrieval (Route B)
-  fusion_rerank.py         # P3 — RRF fusion + LLM/cross-encoder rerank
-  personalization.py       # P4 — user_profile-based ranking boost
-requirements.txt           # P4 owns, everyone can append via PR
-README.md                  # P4 owns final pass, everyone drafts their section
+  contracts.py             ✅ shared — Slots, SessionState, Candidate, RankedList
+  catalog.py               ✅ shared — in-memory FTS5 index + precomputed attributes
+  attributes.py            ✅ shared — attribute vocabulary mirrored from the evaluator
+  state.py                 ✅ P1 — slots, Intent Override, Boundary, question choice
+  intent.py                ✅ P1 — Buying/Browsing router + override detection
+  retrieval_filter.py      ✅ P2 — structured/attribute-match retrieval (Route A)
+  retrieval_dense.py       ⬜ P3 — embeddings + candidate retrieval (Route B)
+  fusion_rerank.py         ⬜ P3 — RRF fusion + LLM/cross-encoder rerank
+  personalization.py       ⬜ P4 — user_profile-based ranking boost
+tests/test_pipeline.py     ✅ 17 tests, run with `python3 -m pytest tests/ -q`
+starter/agent.py           ✅ re-exports root agent.py so the evaluator runs unmodified
+starter/agent_bm25_baseline.py  the original weak baseline, preserved for comparison
 ```
+
+`contracts.py`, `catalog.py` and `attributes.py` are **shared infrastructure**,
+not owned by one person — both retrieval routes need the same 50k-product
+index, and loading it twice would double startup and memory for nothing.
+Coordinate on a call before changing them.
 
 | Person | Owns | Also responsible for |
 |---|---|---|
@@ -32,35 +42,43 @@ README.md                  # P4 owns final pass, everyone drafts their section
 P4 is the integration point — give that person the least new-feature surface
 area so they have slack to review PRs and keep `main` green.
 
-## 2. The one thing to agree on *before* Aug 29: the internal contract
+## 2. The internal contract — DONE, now in code
 
-The org's `docs/agent_api_contract.json` is what lets your team not depend
-on the organizer's harness internals. Do the same thing internally, on a
-call, before hacking opens — write down the exact function signatures /
-dict shapes each module passes to the next:
+Agreed and implemented as `src/contracts.py`:
 
-- What shape are "slots" (`state.py` → `retrieval_filter.py`,
-  `retrieval_dense.py`)?
-- What does a "candidate" look like coming out of each retrieval route,
-  before fusion (`parent_asin`, `score`, any metadata `fusion_rerank.py`
-  needs)?
-- What does `personalization.py` take as input (ranked list + `user_profile`
-  dict) and return (re-ranked list)?
+- **`Slots`** — the ten attribute fields, mirroring the `ask_attribute` enum
+  in `docs/agent_api_contract.json` so nothing needs translating at the
+  `agent.py` boundary.
+- **`SessionState`** — `slots` plus `disclosed_text`, `disclosed_attributes`,
+  `asked_attributes`, `history`, `intent`, `turn`.
+  `disclosed_text` (raw constraint strings, verbatim) is the highest-value
+  field in the system — see the measurements in `PLAN.md`.
+- **`Candidate`** — `parent_asin`, `score`, `source`, `matched_attributes`.
+  Both retrieval routes emit these; fusion and personalization consume them.
+- **`config.py`** — every tunable threshold and weight. Nothing is hardcoded
+  inside a module, so tuning experiments need no code changes.
 
-Once this is written down, all 4 people can build against the *contract*
-in parallel using stub/fake data — nobody blocks on anybody else's module
-actually being finished.
+Change these freely, but change them *together* on a call — every module
+depends on them.
 
 ## 3. Git workflow
 
+**Current reality (updated Aug 26):** one person holds the Claude Code
+account and is generating most of the code, so the per-module feature-branch
+model in the original plan added ceremony without solving a real collision
+problem. We are committing **straight to `main`**, pulling before each push,
+and reviewing after the fact via the commit diff on GitHub.
+
 - `main` stays green — always runnable, always passes `local_evaluator`.
-- One feature branch per module: `feature/dialog-state`, `feature/filter-retrieval`,
-  `feature/dense-retrieval`, `feature/personalization-glue`.
-- Small, frequent PRs (every 3–6 hours during the sprint, not one PR at
-  hour 70) — at least one teammate reviews before merging to `main`.
-- After every merge to `main`, re-run `python3 -m evaluator.local_evaluator`
-  and post the TechnicalScore in the team channel — catches regressions
-  immediately instead of at submission time.
+- Pull before you push. Small, frequent commits with real messages.
+- After every push, re-run `python3 -m evaluator.local_evaluator` and post
+  the TechnicalScore in the team channel — catches regressions immediately
+  instead of at submission time.
+- **Anyone can tune without touching logic:** edit a value in `config.py`,
+  re-run the evaluator, report the score delta. That is the highest-value
+  contribution for anyone not writing modules.
+- Reach for a feature branch only when two people really are editing the
+  same file at the same time.
 
 ## 4. Sync cadence (only 72 scored hours — keep this light)
 
@@ -70,35 +88,44 @@ actually being finished.
 - Task board: GitHub Projects on this repo, one column per module +
   "integration" — low overhead, lives next to the code.
 
-## 5. What to do right now (Aug 26 – Aug 29 12:00pm SGT, before the window opens)
+## 5. Where we are and what's next
 
-Nothing here is scored work — Devpost rules require the submission to be
-original/substantially updated *within* the hacking window, so treat all of
-this as setup, not solution-building.
+**Status: working agent on `main`, TechnicalScore 0.562 vs 0.107 baseline.**
+Full detail and the measurements behind the design are in `PLAN.md`.
 
-1. **Tonight:** confirm the 4 names against the roles in §1, post it in the
-   team channel.
-2. **Everyone, by tomorrow:** clone the repo, download+verify the catalog
-   (steps already in `README.md`), run `python3 -m evaluator.local_evaluator`
-   and confirm you reproduce the baseline (HitRate@10 0.125 / MRR 0.068 /
-   MTTC 9.81) locally — this is just an environment sanity check, catches
-   "it doesn't work on my machine" before it costs you sprint hours.
-3. **Group call before Aug 28:** walk through `PLAN.md` and
-   `docs/agent_api_contract.json` together, agree the internal contract from
-   §2, write it into this file's §2 section or a shared doc.
-4. **P3 specifically:** pick the embedding model/library now (e.g. a local
-   `sentence-transformers` model — no external vector DB per the kit's
-   constraints) so there's no research time lost on day 1. Writing the
-   embedding-build *script* now is fine; whether you're allowed to run it
-   and commit the resulting vectors before the window opens is worth a
-   direct question to the organizers at the workshop (see #5) rather than
-   assuming.
-5. **Aug 28, 4:00–4:45pm SGT:** attend the Track 4 workshop. Bring specific
-   questions — network access at official scoring time, and whether
-   pre-computing embeddings on the frozen catalog before Aug 29 is allowed.
-6. **Before Aug 29 morning:** create the 4 empty feature branches and the
-   file skeleton from §1 so day 1 starts with `git pull` + write code, not
-   repo setup.
+### Everyone, before you write any code
+
+1. `git pull` — then download and verify the catalog locally if you have not
+   already (`README.md` has the commands). `data/catalog.jsonl` is
+   git-ignored, so it does **not** arrive with `git clone`.
+2. Run `python3 -m evaluator.local_evaluator` and confirm you get
+   `0.561976`. If you get something else, say so before changing anything.
+3. Run `python3 -m pytest tests/ -q` — 17 tests should pass.
+4. **Read the four measurements in `PLAN.md`** before proposing changes.
+   Two of them are counter-intuitive (asking questions is free; `budget`
+   and `brand` are worth zero) and both were expensive to discover.
+
+### Highest-value work now, in order
+
+Priorities changed after the measurements — dense retrieval and LLM
+reranking are no longer core. See "Revised priorities" in `PLAN.md`:
+
+1. **`intent_override`** — weakest scenario at 0.433. Slot erasure is coarse.
+2. **MRR (0.407)** — targets are retrieved but not ranked first. This is
+   where an LLM reranker would actually earn its cost, and it is 30% of the
+   score.
+3. **`buying` (0.563) underperforms `browsing` (0.838)** despite disclosing
+   a constraint up front. Nobody has traced why yet — good first task.
+4. **Tuning `config.py`** — no code changes needed, just edit a value,
+   re-run the evaluator, report the delta. `CONFIDENT_MARGIN`,
+   `VERIFIED_MATCH_BONUS`, and `POOL_SIZE` are all unturned guesses.
+
+### Still worth asking at the Aug 28 workshop (4:00–4:45pm SGT)
+
+- Is network access available at official scoring time? *(Our scored path is
+  offline either way, so this is now a question about whether adding an LLM
+  stage is safe — not a risk to what already works.)*
+- Any constraint on precomputing embeddings over the frozen catalog?
 
 ## 6. Submission ownership (from `docs/submission_rules.md`, tracked in PLAN.md)
 

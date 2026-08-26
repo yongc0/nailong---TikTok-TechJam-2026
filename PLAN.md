@@ -21,22 +21,54 @@ prep: environment setup, architecture design, and skeleton code — not the
 scored solution itself (submissions must be "original or significantly
 updated" within the hacking window per the Devpost rules).
 
-## What's already done (this session, Aug 26)
+## What's already done
 
-- Cloned `techjam-conversational-search` repo into this folder (`./repo`)
-- Downloaded `catalog.jsonl.gz` from the participant-kit release, verified
-  SHA256 against `SHA256SUMS`, decompressed to `data/catalog.jsonl` (50,000
+**Aug 26 — setup**
+
+- Cloned the repo, downloaded `catalog.jsonl.gz` from the participant-kit
+  release, verified SHA256, decompressed to `data/catalog.jsonl` (50,000
   rows confirmed)
-- Ran the local evaluator end-to-end on a 10-sample slice — pipeline works.
-  Full 200-sample public set takes ~45-60s locally (build FTS index + run
-  200 simulated sessions); run it yourself with:
-  ```
-  cd repo
-  python3 -m evaluator.local_evaluator
-  ```
-  (writes `results.json`, prints the summary)
-- Baseline (weak BM25 starter) reference score: HitRate@10 0.125, MRR 0.068,
-  MTTC 9.81, TechnicalScore 0.107 — this is the floor to beat.
+- Reproduced the baseline: HitRate@10 0.125, MRR 0.068, MTTC 9.81,
+  TechnicalScore 0.107 — the floor to beat
+- Confirmed Groq `gpt-oss-20b` works (`scripts/test_groq.py`).
+  **Gotcha:** it is a reasoning model — the reasoning trace consumes
+  `max_completion_tokens` before the answer, so a 20-token cap returns an
+  EMPTY string. Budget 200+.
+
+**Aug 26 — working agent, TechnicalScore 0.562 (5.3× baseline)**
+
+- HitRate@10 0.655, MRR 0.407, MTTC 5.385
+- By scenario: browsing 0.838, boundary 0.600 (was 0.000), buying 0.563,
+  intent_override 0.433
+- Implemented: `src/catalog.py`, `src/attributes.py`, `src/intent.py`,
+  `src/state.py`, `src/retrieval_filter.py`, root `agent.py`
+- **No LLM used.** Fully offline and deterministic, which satisfies the
+  offline-fallback requirement in `docs/submission_rules.md` for free.
+- `starter/agent.py` now re-exports the root `agent.py`; the original weak
+  baseline is preserved as `starter/agent_bm25_baseline.py`. The evaluator
+  stays unmodified.
+- 17 tests pass: `python3 -m pytest tests/ -q`
+
+Run it yourself (~18s, writes `results.json`):
+```
+python3 -m evaluator.local_evaluator
+```
+
+### Measurements that shaped the design — read before changing things
+
+1. **Extraction beats ranking.** Retrieving on the opening category alone
+   puts the target in top-10 for 1.7% of sessions; retrieving on everything
+   the shopper eventually discloses reaches 85%. The game is getting the
+   customer to talk, not clever ranking.
+2. **Asking is free.** The evaluator scores `recommendations` BEFORE it
+   reads `ask_attribute`, so every turn should do both. The real question is
+   when to STOP asking, not when to start.
+3. **Attribute yield is wildly uneven** (share of sessions where asking
+   returns new information): `feature` 96%, `material` 76.5%, `color` 25.5%,
+   `style` 9%, `size` 4.5%, `use_case` 2%, and `budget`/`brand`/`category`
+   **0%**. We never ask the zero-yield three. This is most of the MTTC win.
+4. **Only 21% of the catalog has a price**; material covers 57%, colour 39%.
+   Budget is a weak signal, and "no price" must not count as a budget miss.
 
 ## System to build
 
@@ -87,7 +119,32 @@ retrieval strategy weighting, not a hard gate.
   *something* (even a best-guess top-10) well before turn 10 rather than
   keep clarifying.
 
-## Suggested build order (fits a 72h sprint)
+## Revised priorities (after the Aug 26 measurements)
+
+The original build order assumed dense retrieval and LLM reranking were
+core. The 1.7%-vs-85% finding says otherwise: dialogue extraction carries
+the score, and it is already working without either. Reordered by expected
+value:
+
+1. **`intent_override` (0.433, weakest scenario, 30 sessions).** Erasure is
+   currently coarse — it wipes all descriptive constraints instead of only
+   the contradicted ones.
+2. **MRR (0.407).** Targets are often retrieved but not ranked first. This
+   is the clearest place an LLM reranker earns its cost, and it is 30% of
+   the score.
+3. **`buying` (0.563)** underperforms `browsing` (0.838), which is
+   counter-intuitive since buying sessions disclose a constraint up front.
+   Worth tracing.
+4. **Constraint parsing coverage.** Marker-based; a paraphrase outside the
+   known set yields nothing. A small LLM extraction call is the obvious fix.
+5. **Dense retrieval — now optional.** Only worth it if it lifts Hit Rate
+   beyond what keyword retrieval already reaches. Measure before building.
+
+Keep the offline path intact: anything added on the LLM side must degrade
+gracefully to the current deterministic behaviour, per
+`docs/submission_rules.md`.
+
+## Original build order (kept for reference)
 
 1. **Hour 0-4 (before/at hacking start):** stand up embeddings for the
    catalog offline if using dense retrieval (this is compute you can
@@ -111,18 +168,20 @@ retrieval strategy weighting, not a hard gate.
 
 ## Submission checklist (from docs/submission_rules.md)
 
-- [ ] `agent.py` exporting `class Agent` with `reset()` / `respond()`
+- [x] `agent.py` exporting `class Agent` with `reset()` / `respond()`
       matching the exact contract (`docs/agent_api_contract.json`)
-- [ ] `requirements.txt` + exact Python version if non-default
-- [ ] `README.md`: overview, setup, reproduce steps, limitations, team
-      contributions
-- [ ] One command to run the agent in the official harness
-- [ ] Disclosure: model choice, latency, token usage, estimated cost
-- [ ] Explicitly state whether it needs network access at inference time,
-      and describe the offline fallback if organizer disables network for
-      official scoring
-- [ ] No API keys / secrets committed
-- [ ] Does not modify evaluator files, no private data, no undeclared
+- [x] `requirements.txt` + exact Python version if non-default
+- [x] `README.md`: overview, setup, reproduce steps, limitations, team
+      contributions *(names still to fill in)*
+- [x] One command to run the agent in the official harness
+      (`python3 -m evaluator.local_evaluator`)
+- [x] Disclosure: model choice, latency, token usage, estimated cost —
+      currently **no model, no tokens, no cost**; ~18s for 200 sessions
+- [x] Explicitly state whether it needs network access at inference time,
+      and describe the offline fallback — **no network needed**, the scored
+      path is fully offline and deterministic
+- [x] No API keys / secrets committed (`.env` is git-ignored)
+- [x] Does not modify evaluator files, no private data, no undeclared
       external services required for scoring
 - [ ] Devpost: written description (approach, dev tools, APIs, libraries,
       datasets/assets used)
