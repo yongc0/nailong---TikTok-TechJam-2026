@@ -211,6 +211,53 @@ Net effect +0.0002, i.e. noise. Kept because it is the correct treatment of
 the long-term signal and it addresses the pillar, NOT because it moves the
 score — and the writeup should say exactly that.
 
+## Phase 3.0 — LLM rerank evaluated and rejected (Aug 26)
+
+Tested before building, on 40 real sessions (0 unusable replies), sampling
+BOTH groups deliberately — a rerank that lifts ambiguous sessions but
+demotes converged ones is a net loss, and 104 of 200 public sessions are
+already ranked 1st and can only lose.
+
+| group | n | our MRR | LLM MRR | delta |
+|---|---|---|---|---|
+| ambiguous (hit, not rank 1) | 25 | 0.352 | 0.393 | **+0.041** |
+| converged (already rank 1)  | 15 | 1.000 | 0.893 | **-0.107** |
+
+Projected over the real 200-session mix: **-0.0109 TechnicalScore**
+(0.8759 -> 0.8650). The LLM demoted 2 of 15 already-correct sessions —
+pure loss — and on ambiguous cases won 6 / lost 4 / tied 15, which is
+indistinguishable from chance.
+
+**Even granting a perfect oracle gate** that only ever fires on ambiguous
+sessions and never touches a converged one, the ceiling is **+0.0057**
+TechnicalScore. That is below noise, and it would cost network dependency
+at scoring time, ~100 minutes of runtime, and free-tier quota exhaustion.
+
+Why our ranker wins: constraint coverage does exact phrase matching against
+text the customer quoted verbatim from the target's own listing. The LLM
+reasons semantically and cannot match that reliably — the task rewards
+literal completeness, not judgement. A stronger model would not obviously
+change this.
+
+**Decision: not shipping an LLM stage.** The pipeline stays fully offline
+and deterministic. Reproduce with:
+
+```
+python3 scripts/validate_llm_rerank.py 25 15
+python3 scripts/analyse_llm_validation.py
+```
+
+### Rate-limit arithmetic, for the record
+
+Our agent runs 372 turns over 200 sessions (1.86/session), so ~1,488 for
+the private 800. Against Groq's free tier (30 RPM / 1,000 RPD / 8,000 TPM /
+200,000 TPD), a per-turn rerank exceeds the daily TOKEN budget 2-4x on the
+public set alone, and exceeds both request and token budgets on the private
+set (4-8 hours of wall clock). Cost was never the obstacle — the same
+private run on the paid tier is about $0.33 — the obstacle is that
+`docs/submission_rules.md` warns network access may be disabled at scoring
+time, so an LLM cannot sit on the scored path regardless.
+
 ## Revised priorities (after the Aug 26 measurements)
 
 The original build order assumed dense retrieval and LLM reranking were

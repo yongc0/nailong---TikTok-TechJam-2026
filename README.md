@@ -211,7 +211,15 @@ Token usage reported to the evaluator is currently `0` for the same reason.
 
 ## Limitations and what we would improve
 
-- **Dense retrieval and LLM reranking are not implemented yet.** They were
+- **An LLM reranking stage was tested and rejected on evidence.** On 40 real
+  sessions it lifted ambiguous cases (+0.041 MRR) but demoted already-correct
+  ones (-0.107 MRR), projecting to **-0.011 TechnicalScore**; even a perfect
+  invocation gate caps the gain at +0.006, below noise. Our ranker wins
+  because constraint coverage matches text the customer quoted verbatim from
+  the target's listing — the task rewards literal completeness over semantic
+  judgement. Reproduce with `scripts/validate_llm_rerank.py`. This is why the
+  pipeline is deliberately, not incidentally, offline.
+- **Dense retrieval is not implemented.** They were
   planned as core, but the 85%-with-full-disclosure measurement showed dialogue
   extraction mattered far more, so they were deprioritised. Retrieval is close
   to saturated: when the agent misses, the target is still inside the candidate

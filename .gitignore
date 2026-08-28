@@ -17,3 +17,6 @@ tests/test_5core_builder.py
 tests/test_organizer_pipeline.py
 *.log
 results/
+
+# Phase 3.0 experiment output — regenerate with scripts/validate_llm_rerank.py
+results_llm_validation.json
