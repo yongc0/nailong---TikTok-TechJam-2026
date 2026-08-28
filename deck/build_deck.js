@@ -1,4 +1,18 @@
 const pptxgen = require("pptxgenjs");
+const fs = require("fs");
+const path = require("path");
+
+// ─── EDIT ME ───────────────────────────────────────────────────────────────
+// Drop a square-ish photo at deck/photos/<photo> for each person. Any member
+// without a photo file renders a monogram avatar instead, so the slide always
+// looks finished — add photos as they arrive and re-run this script.
+const TEAM = [
+  { name: "Qiao Enn",   role: "Dialog & Retrieval",   owns: "State machine, intent routing, and the constraint-coverage ranker.", photo: "p1.jpg" },
+  { name: "Teammate 2", role: "Evaluation",           owns: "Metric analysis, weight sweeps, and the LLM rerank experiment.",     photo: "p2.jpg" },
+  { name: "Teammate 3", role: "Retrieval & Ranking",  owns: "Catalogue index, attribute extraction, popularity and category priors.", photo: "p3.jpg" },
+  { name: "Teammate 4", role: "Integration",          owns: "Agent glue, API contract conformance, tests, and submission.",       photo: "p4.jpg" },
+];
+// ───────────────────────────────────────────────────────────────────────────
 
 const pres = new pptxgen();
 pres.layout = "LAYOUT_WIDE";              // 13.3 x 7.5 in — set BEFORE adding slides
@@ -416,7 +430,57 @@ function card(s, x, y, w, h, fill = MIST) {
   s.addNotes("We think stating our assumptions is part of the engineering. The popularity prior is the one place our ranking leans on how the benchmark was built, and we say so in the repo rather than hoping nobody checks.");
 }
 
-/* ─── 12. Close ────────────────────────────────────────────────────────── */
+
+/* ─── 12. Team ─────────────────────────────────────────────────────────── */
+{
+  const s = darkSlide();
+  s.addText("THE TEAM", { x: M, y: 0.5, w: 8, h: 0.28, isTextBox: true, margin: 0,
+    fontFace: B, fontSize: 12, bold: true, color: MINT, charSpacing: 2 });
+  s.addText("Four people, one measurement discipline", { x: M, y: 0.8, w: 11.9, h: 0.7,
+    isTextBox: true, margin: 0, fontFace: H, fontSize: 34, bold: true, color: WHITE });
+  s.addText("Everyone ran the evaluator. Every claim in this deck is one of us re-running it and getting the same number.",
+    { x: M, y: 1.54, w: 11.9, h: 0.4, isTextBox: true, margin: 0,
+      fontFace: B, fontSize: 15, color: FOG });
+
+  const CARD_W = 2.94, GAP = 0.11;
+  TEAM.forEach((m, i) => {
+    const x = M + i * (CARD_W + GAP);
+    s.addShape(pres.ShapeType.roundRect, { x, y: 2.24, w: CARD_W, h: 3.5, rectRadius: 0.06,
+      fill: { color: INK2 }, line: { color: INK2 } });
+
+    // Circular portrait, or a monogram avatar when no photo is present yet.
+    const AV = 1.24, ax = x + (CARD_W - AV) / 2, ay = 2.5;
+    const file = path.join(__dirname, "photos", m.photo || "");
+    if (m.photo && fs.existsSync(file)) {
+      // Ring drawn first, photo centred on top, so a real portrait gets the
+      // same mint ring as the monogram fallback and the row stays uniform.
+      s.addShape(pres.ShapeType.ellipse, { x: ax - 0.045, y: ay - 0.045,
+        w: AV + 0.09, h: AV + 0.09, fill: { color: MINT }, line: { color: MINT } });
+      s.addImage({ path: file, x: ax, y: ay, w: AV, h: AV,
+        rounding: true, sizing: { type: "cover", w: AV, h: AV } });
+    } else {
+      s.addShape(pres.ShapeType.ellipse, { x: ax, y: ay, w: AV, h: AV,
+        fill: { color: TEAL }, line: { color: MINT, width: 2 } });
+      const initials = m.name.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
+      s.addText(initials, { x: ax, y: ay, w: AV, h: AV, isTextBox: true, margin: 0,
+        fontFace: H, fontSize: 34, bold: true, color: WHITE, align: "center", valign: "middle" });
+    }
+
+    s.addText(m.name, { x: x + 0.2, y: 3.92, w: CARD_W - 0.4, h: 0.36, isTextBox: true,
+      margin: 0, fontFace: B, fontSize: 16, bold: true, color: WHITE, align: "center" });
+    s.addText(m.role, { x: x + 0.2, y: 4.26, w: CARD_W - 0.4, h: 0.3, isTextBox: true,
+      margin: 0, fontFace: B, fontSize: 12.5, bold: true, color: MINT, align: "center" });
+    s.addText(m.owns, { x: x + 0.24, y: 4.64, w: CARD_W - 0.48, h: 0.96, isTextBox: true,
+      margin: 0, fontFace: B, fontSize: 11.5, color: FOG, align: "center", lineSpacing: 15 });
+  });
+
+  s.addText("No one owned a silo. The two costliest bugs were found by replaying sessions together, not by reading each other's diffs.",
+    { x: M, y: 6.06, w: 12.1, h: 0.44, isTextBox: true, margin: 0,
+      fontFace: B, fontSize: 13.5, italic: true, color: FOG });
+  s.addNotes("Our team. We split ownership across dialogue, retrieval, evaluation and integration — but everyone ran the evaluator themselves, which is why every number in this deck is reproducible by any of us.");
+}
+
+/* ─── 13. Close ────────────────────────────────────────────────────────── */
 {
   const s = darkSlide();
   s.addShape(pres.ShapeType.roundRect, { x: M, y: 1.0, w: 1.9, h: 0.46, rectRadius: 0.1,

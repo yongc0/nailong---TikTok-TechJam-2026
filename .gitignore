@@ -26,4 +26,9 @@ deck/node_modules/
 deck/package-lock.json
 deck/package.json
 deck/slide-*.jpg
+deck/phototest*.jpg
 deck/*.pdf
+# Team photos are personal data — keep them out of a public repo.
+deck/photos/*.jpg
+deck/photos/*.jpeg
+deck/photos/*.png
