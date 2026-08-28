@@ -37,8 +37,9 @@ updated" within the hacking window per the Devpost rules).
 
 **Aug 26 — working agent, TechnicalScore 0.876 (8.2× baseline)**
 
-- HitRate@10 0.985, MRR 0.669, MTTC 1.875 — 197 of 200 sessions convert,
-  typically on the second message
+- HitRate@10 0.985, MRR 0.669, MTTC 1.875 — 197 of 200 sessions convert.
+  60% resolve on turn 1 (median and mode); 79% by turn 2. MTTC counts the
+  3 misses as turn 11, so the mean among hits alone is 1.736.
 - By scenario (Hit Rate@10): browsing 1.000, buying 0.988,
   intent_override 0.967, boundary 0.900 (all were 0.000-0.238 at baseline)
 - Implemented: `src/catalog.py`, `src/attributes.py`, `src/intent.py`,

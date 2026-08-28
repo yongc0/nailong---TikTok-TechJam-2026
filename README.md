@@ -18,7 +18,8 @@ dependencies**.
 
 Per-scenario Hit Rate@10: browsing **1.000** · buying **0.988** ·
 intent_override **0.967** · boundary **0.900** (baseline 0.000).
-197 of 200 sessions find the target, typically on the second message.
+197 of 200 sessions find the target. 60% resolve on the shopper's first
+message (median and mode = turn 1); MTTC averages 1.875 turns.
 
 ## The core insight
 

@@ -70,7 +70,7 @@ function card(s, x, y, w, h, fill = MIST) {
 
   s.addText("Shopping Copilot", { x: M, y: 1.72, w: 9.6, h: 1.0, isTextBox: true, margin: 0,
     fontFace: H, fontSize: 54, bold: true, color: WHITE });
-  s.addText("Conversational search that finds the product in under two turns",
+  s.addText("Conversational search that resolves 60% of sessions on the first message",
     { x: M, y: 2.78, w: 9.4, h: 0.5, isTextBox: true, margin: 0,
       fontFace: B, fontSize: 19, color: SEA });
 
@@ -328,7 +328,7 @@ function card(s, x, y, w, h, fill = MIST) {
 
 /* ─── 9. Results ───────────────────────────────────────────────────────── */
 {
-  const s = lightSlide("197 of 200 sessions convert, in under two turns", "Final results");
+  const s = lightSlide("197 of 200 sessions convert — 60% on the first message", "Final results");
   const stats = [["0.985", "Hit Rate@10", "from 0.125"], ["0.670", "MRR", "from 0.068"],
                  ["1.875", "MTTC turns", "from 9.81"], ["0.876", "TechnicalScore", "from 0.107"]];
   stats.forEach(([big, label, sub], i) => {
@@ -359,7 +359,7 @@ function card(s, x, y, w, h, fill = MIST) {
     s.addText(n + " sessions", { x: 10.5, y, w: 2.2, h: 0.42, isTextBox: true, margin: 0,
       fontFace: B, fontSize: 12, color: SLATE, valign: "middle" });
   });
-  s.addNotes("Final numbers. Browsing is perfect at 1.0. Boundary is our weakest at 0.9, but that's only ten sessions so we treat the estimate as noisy rather than tuning against it.");
+  s.addNotes("Final numbers. MTTC averages 1.875 turns, but the distribution matters more than the mean: 60 percent of sessions resolve on the shopper's very first message, and 79 percent by the second. Browsing is perfect at 1.0. Boundary is our weakest at 0.9, but that's only ten sessions so we treat the estimate as noisy rather than tuning against it.");
 }
 
 /* ─── 10. Feasibility ──────────────────────────────────────────────────── */
