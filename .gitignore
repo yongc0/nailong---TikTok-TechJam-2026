@@ -20,3 +20,10 @@ results/
 
 # Phase 3.0 experiment output — regenerate with scripts/validate_llm_rerank.py
 results_llm_validation.json
+
+# Deck build artefacts — rebuild with: cd deck && node build_deck.js
+deck/node_modules/
+deck/package-lock.json
+deck/package.json
+deck/slide-*.jpg
+deck/*.pdf
