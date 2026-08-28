@@ -90,7 +90,7 @@ and reviewing after the fact via the commit diff on GitHub.
 
 ## 5. Where we are and what's next
 
-**Status: working agent on `main`, TechnicalScore 0.744 vs 0.107 baseline.**
+**Status: working agent on `main`, TechnicalScore 0.876 vs 0.107 baseline.**
 Full detail and the measurements behind the design are in `PLAN.md`.
 
 ### Everyone, before you write any code
@@ -99,7 +99,7 @@ Full detail and the measurements behind the design are in `PLAN.md`.
    already (`README.md` has the commands). `data/catalog.jsonl` is
    git-ignored, so it does **not** arrive with `git clone`.
 2. Run `python3 -m evaluator.local_evaluator` and confirm you get
-   `0.743549`. If you get something else, say so before changing anything.
+   `0.875665`. If you get something else, say so before changing anything.
 3. Run `python3 -m pytest tests/ -q` — 19 tests should pass.
 4. **Read the four measurements in `PLAN.md`** before proposing changes.
    Two of them are counter-intuitive (asking questions is free; `budget`

@@ -70,6 +70,42 @@ POOL_SIZE = 800
 # structured matches costs a little, since only material/colour/budget/
 # brand are verifiable at all.
 VERIFIED_MATCH_BONUS = 0.5
+# Weight on constraint coverage — the fraction of the shopper's disclosed
+# constraints found verbatim in a product's text. Measured: 97.1% of
+# constraints appear literally in their own target's text, so coverage
+# separates the target from distractors far more sharply than term-frequency
+# scoring does.
+# SWEPT: 0.5 -> 0.7843, 1.0 -> 0.7849, 2.0 -> 0.7897, 3.0 and 5.0 -> 0.7897
+# (plateau). Above 2.0 coverage dominates and the keyword/attribute terms
+# act purely as tiebreakers, which is the intended behaviour.
+COVERAGE_WEIGHT = 2.0
+
+# Weight on a popularity prior, log-scaled over rating_number. Targets are
+# products someone actually bought, so review volume is weak evidence of
+# purchase likelihood. Used only as a tiebreaker between candidates with
+# equal constraint coverage — set to 0.0 to disable.
+# SWEPT: 0.0 -> 0.7897, 0.05 -> 0.7963, 0.1 -> 0.7979, 0.25 -> 0.8151,
+# 0.5 -> 0.8468, 0.75 -> 0.8556, 1.0 -> 0.8538, 1.5 -> 0.8590,
+# 2.5 -> 0.8588, 4.0 -> 0.8392. Broad plateau across 0.75-2.5, which is
+# more trustworthy than a sharp peak would be.
+#
+# CAVEAT worth stating in the writeup: this signal is strong partly because
+# of how the benchmark was built. Sessions are sampled from the Amazon
+# 5-core leave-last-out split, so every target is an item real users
+# actually bought and reviewed — review volume is therefore genuine
+# evidence of purchase likelihood, not an artefact. The private set is
+# sampled the same way, so it should transfer, but this is a distributional
+# assumption rather than a property of the catalogue.
+POPULARITY_WEIGHT = 1.5
+
+# Weight on category-path agreement: how much of the shopper's stated
+# category appears in the product's own category path. Narrower than full
+# text matching, so it should separate a "basketball shorts" from a
+# "basketball jersey" that mentions shorts in passing.
+# SWEPT: 0.0 -> 0.8590, 0.25 -> 0.8632, 0.5 -> 0.8702, 1.0 -> 0.8724,
+# 2.0 -> 0.8757, and flat from 3.0 to 10.0. Set at the start of the plateau.
+CATEGORY_WEIGHT = 3.0
+
 # Budget is a proximity target ("budget around $X"), not a ceiling — this is
 # the fraction of the stated price still counted as a match.
 BUDGET_TOLERANCE = 0.35

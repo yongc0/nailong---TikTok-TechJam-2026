@@ -4,20 +4,21 @@ TikTok TechJam 2026, Track 4. A multi-turn shopping agent that finds a customer'
 intended product in a 50,000-item Amazon catalog by asking as few questions as
 possible.
 
-**Current score on the 200-session public set: TechnicalScore 0.744** — 7.0× the
+**Current score on the 200-session public set: TechnicalScore 0.876** — 8.2× the
 provided BM25 baseline (0.107), using **no LLM and no third-party runtime
 dependencies**.
 
 | Metric | Weak BM25 baseline | This agent | Change |
 |---|---|---|---|
-| Hit Rate@10 | 0.125 | **0.870** | +596% |
-| MRR | 0.068 | **0.566** | +732% |
-| MTTC (turns to conversion) | 9.81 | **4.070** | −5.7 turns |
-| Efficiency | 0.119 | **0.693** | — |
-| **TechnicalScore** | **0.107** | **0.744** | **7.0×** |
+| Hit Rate@10 | 0.125 | **0.985** | +688% |
+| MRR | 0.068 | **0.669** | +883% |
+| MTTC (turns to conversion) | 9.81 | **1.875** | −7.9 turns |
+| Efficiency | 0.119 | **0.913** | — |
+| **TechnicalScore** | **0.107** | **0.876** | **8.2×** |
 
-Per-scenario Hit Rate@10: buying **0.887** · browsing **0.887** ·
-intent_override **0.833** · boundary **0.700** (baseline 0.000).
+Per-scenario Hit Rate@10: browsing **1.000** · buying **0.988** ·
+intent_override **0.967** · boundary **0.900** (baseline 0.000).
+197 of 200 sessions find the target, typically on the second message.
 
 ## The core insight
 
@@ -86,13 +87,37 @@ branch in the classifier at all, and `category` is disclosed for free in turn 1.
 We ask `feature` first and **never ask the three zero-yield attributes** — each
 wasted question is a turn charged against MTTC. See `config.ATTRIBUTE_PRIORITY`.
 
-**3. Retrieval matches broadly and recovers precision by ranking.** The catalog
+**3. Ranking rewards completeness, not term frequency.** The disclosed
+constraints are quoted verbatim from the target's own listing — measured, 97.1%
+of them appear literally in their target's text. So the product satisfying
+*every* stated requirement is almost always the right one, while BM25 would
+happily rank a listing that says "mesh" five times above one that quietly meets
+all four constraints. `_constraint_coverage` scores the fraction of disclosed
+phrases found verbatim in each candidate; it was worth +0.046.
+
+Two further signals refine the ordering:
+
+- **Popularity prior (+0.069).** Every target is an item real users actually
+  bought and reviewed, so log review-volume is genuine evidence of purchase
+  likelihood. Worth stating plainly: this leans on how the benchmark was
+  sampled (Amazon 5-core leave-last-out), not on a property of the catalogue.
+  The private set is sampled the same way, so it should transfer.
+- **Category-path match (+0.017).** Matched against the product's category
+  field alone, so a jersey that mentions shorts in its description does not
+  score as a shorts match.
+
+Every weight sits on a broad plateau rather than a sharp peak — popularity is
+flat from 0.75 to 2.5, category from 3.0 to 10.0. Flat optima survive a
+distribution shift; sharp ones are usually fitted noise. All sweeps are
+recorded inline in `config.py`.
+
+**4. Retrieval matches broadly and recovers precision by ranking.** The catalog
 has no structured colour/material/size/brand fields, so filtering is really text
 matching. A strict `AND` across accumulated constraints returns zero rows often,
 and an empty list is a guaranteed miss for that turn. We `OR`-match into a wide
 pool (800) and rank by how many constraints each product verifiably satisfies.
 
-**4. Budget is proximity, not a ceiling.** Budget is disclosed as *"budget
+**5. Budget is proximity, not a ceiling.** Budget is disclosed as *"budget
 around $X"* where X is the target's own price, so `<= X` would wrongly reward
 anything cheap. Products with no price are left unmatched but **not penalised** —
 only 21% of the catalog is priced, and treating unknown as failure would demote
@@ -125,7 +150,7 @@ python3 -m evaluator.local_evaluator
 ```
 
 Runs all 200 public sessions in ~18s on a laptop and writes `results.json`.
-The printed `recommended_technical_score` should read `0.743549`.
+The printed `recommended_technical_score` should read `0.875665`.
 
 Run the tests:
 

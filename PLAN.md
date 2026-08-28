@@ -35,11 +35,12 @@ updated" within the hacking window per the Devpost rules).
   `max_completion_tokens` before the answer, so a 20-token cap returns an
   EMPTY string. Budget 200+.
 
-**Aug 26 — working agent, TechnicalScore 0.744 (7.0× baseline)**
+**Aug 26 — working agent, TechnicalScore 0.876 (8.2× baseline)**
 
-- HitRate@10 0.870, MRR 0.566, MTTC 4.070
-- By scenario (Hit Rate@10): buying 0.887, browsing 0.887,
-  intent_override 0.833, boundary 0.700 (was 0.000)
+- HitRate@10 0.985, MRR 0.669, MTTC 1.875 — 197 of 200 sessions convert,
+  typically on the second message
+- By scenario (Hit Rate@10): browsing 1.000, buying 0.988,
+  intent_override 0.967, boundary 0.900 (all were 0.000-0.238 at baseline)
 - Implemented: `src/catalog.py`, `src/attributes.py`, `src/intent.py`,
   `src/state.py`, `src/retrieval_filter.py`, root `agent.py`
 - **No LLM used.** Fully offline and deterministic, which satisfies the
@@ -141,13 +142,45 @@ Three changes, measured one at a time:
    agent effectively always asks — the correct policy when questions cost
    nothing.
 
-### Where the remaining loss is
+### Where the remaining loss was
 
 Of the misses at 0.562, **99% had the target still inside the candidate
 pool** — 67% at rank 11-50, 32% at rank 51-800, only 1 absent entirely.
-Retrieval is close to saturated; ranking is the remaining problem. That is
-what makes a learned ranker (not an LLM, which would break the offline
-guarantee) the highest-value next step.
+Retrieval was close to saturated; ranking was the remaining problem. Phase 2a
+acted on that.
+
+## Phase 2a results (Aug 26) — 0.744 → 0.876
+
+Three ranking features, each measured separately and each weight swept
+(results recorded inline in `config.py`):
+
+1. **Constraint coverage: 0.744 → 0.790.** The customer quotes constraints
+   verbatim from the target's own listing — 97.1% of them appear literally
+   in their target's text — so the product satisfying ALL stated
+   requirements is almost always the right one. BM25 rewards term frequency
+   and cannot express completeness; coverage can.
+2. **Popularity prior: 0.790 → 0.859.** Log review-volume. Bigger than
+   expected. Every target is an item real users actually bought, so review
+   volume is real evidence of purchase likelihood — but this leans on the
+   benchmark's 5-core leave-last-out sampling rather than on the catalogue
+   itself. The private set is sampled identically, so it should transfer.
+   State this in the writeup rather than leaving it implicit.
+3. **Category-path match: 0.859 → 0.876.** Matched against the category
+   field alone, so a jersey mentioning shorts is not treated as shorts.
+
+Earlier weights were re-swept afterwards, since the features interact.
+
+**Guard against overfitting:** every optimum is a broad plateau, not a spike
+(popularity flat 0.75-2.5, category flat 3.0-10.0). Flat optima survive a
+distribution shift; sharp ones are usually fitted noise.
+
+### Remaining headroom
+
+197/200 hits, 104 at rank 1 and 93 at ranks 2-10. Perfect ranking would add
+about +0.095 (ceiling ~0.97), so MRR is now the entire remaining gap. A
+learned ranker targets exactly that — but with 197/200 already hit and only
+200 training sessions, the risk of a fitted model failing to transfer now
+rivals the upside. Decide on cross-validated evidence, not train-set gain.
 
 ## Revised priorities (after the Aug 26 measurements)
 
