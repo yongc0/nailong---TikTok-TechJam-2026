@@ -46,8 +46,9 @@ user message
    ├─ state.update_slots ......... accumulate constraints; retract on Intent
    │                               Override; mark Boundary attributes settled
    ├─ intent.classify_intent ..... Buying vs Browsing (rules, no LLM)
-   ├─ retrieval_filter.retrieve .. wide keyword pool → rescore by verified
-   │                               attribute matches
+   ├─ retrieval_filter.retrieve .. wide keyword pool → rescore on constraint
+   │                               coverage, popularity, category, attributes
+   ├─ personalization.boost ...... long-term profile, tie-break only
    └─ state.choose_attribute ..... highest-yield unanswered attribute
                 │
                 ▼
@@ -184,12 +185,14 @@ src/
   intent.py                  Buying/Browsing router + override detection
   state.py                   slot accumulation, override, boundary, question choice
   retrieval_filter.py        Route A — attribute-match retrieval
-  retrieval_dense.py         Route B — embedding retrieval (not yet implemented)
-  fusion_rerank.py           route fusion + LLM rerank (not yet implemented)
+  retrieval_dense.py         Route B — embedding retrieval (stub; see Limitations)
+  fusion_rerank.py           route fusion + LLM rerank (stub; see Limitations)
   personalization.py         long-term profile prior, used as a tie-break
-tests/test_pipeline.py       unit tests for the above
+tests/test_pipeline.py       21 unit tests for the above
 scripts/test_groq.py         Groq connectivity smoke test
-starter/agent_bm25_baseline.py   the original weak baseline, preserved
+scripts/validate_llm_rerank.py    Phase 3.0 experiment: LLM rerank vs ours
+scripts/analyse_llm_validation.py scores that experiment
+starter/agent_bm25_baseline.py    the original weak baseline, preserved
 ```
 
 `starter/agent.py` re-exports the root `agent.py` so
@@ -203,11 +206,17 @@ calls, uses no external services, and needs no API key. If organizer policy
 disables network access at scoring time, the agent runs unchanged with identical
 results.
 
-`groq` and `python-dotenv` appear in `requirements.txt` only for the optional LLM
-reranking stage under development; it is not on the scoring path, and the agent
-degrades to the current behaviour if it is unavailable.
+`groq` and `python-dotenv` appear in `requirements.txt` only for the offline
+experiment in `scripts/validate_llm_rerank.py`, which measured an LLM reranker
+and found it net-negative (see Limitations). Nothing in the scored path imports
+them, and the agent runs unchanged if they are absent.
 
-Token usage reported to the evaluator is currently `0` for the same reason.
+Token usage reported to the evaluator is `0`, and model cost is `$0`, because
+no model is called. Latency is ~18s for all 200 sessions end to end (~90ms per
+session), including a one-off 4.7s index build; peak memory is 0.41 GB.
+
+This is a measured decision, not an omission: we tested the LLM stage and it
+made the ranking worse.
 
 ## Limitations and what we would improve
 
@@ -219,26 +228,32 @@ Token usage reported to the evaluator is currently `0` for the same reason.
   the target's listing — the task rewards literal completeness over semantic
   judgement. Reproduce with `scripts/validate_llm_rerank.py`. This is why the
   pipeline is deliberately, not incidentally, offline.
-- **Dense retrieval is not implemented.** They were
-  planned as core, but the 85%-with-full-disclosure measurement showed dialogue
-  extraction mattered far more, so they were deprioritised. Retrieval is close
-  to saturated: when the agent misses, the target is still inside the candidate
-  pool 99% of the time, just ranked too low. A learned ranker over the existing
-  pool is the clearest remaining win, and unlike an LLM it keeps the pipeline
-  offline.
+- **Dense (embedding) retrieval is not implemented.** It was planned as core,
+  but the 1.7%-vs-85% measurement showed dialogue extraction mattered far more.
+  Retrieval is now close to saturated — 197 of 200 sessions find the target, and
+  the 3 that fail are ranking failures, not coverage failures — so a second
+  retrieval route has almost nothing left to add. `retrieval_dense.py` and
+  `fusion_rerank.py` remain stubs, deliberately.
+- **A learned ranker (LTR) was scoped but not built.** The remaining +0.095 of
+  headroom is all in MRR, which is what it would target. We stopped because
+  with 197/200 sessions already hit and only 200 training sessions available,
+  the risk of a fitted model failing to transfer to the private set now rivals
+  the upside. It is the right next experiment, but it must be judged on
+  cross-validated evidence (GroupKFold by session), never on train-set gain.
 - **`intent.py` is built but barely load-bearing.** Intent is classified and
   tracked, but does not yet change retrieval weighting between routes.
 - **Personalization is principled but worth almost nothing here (+0.0002,
-  within noise).** The profile is too coarse to separate candidates that
+  i.e. noise).** The profile is too coarse to separate candidates that
   already match the session constraints. It earns its place as correct
   handling of the long-term signal, not as a score contributor, and we would
   rather say so than overclaim it.
-- **`boundary` is now our weakest scenario (0.700 Hit Rate, 10 sessions).** The
-  customer refuses to narrow one attribute, and we have no special handling
-  beyond marking it settled. The sample is small, so the estimate is noisy.
-- **`intent_override` MTTC (5.43) stays high by construction** — the evaluator
+- **`boundary` remains our weakest scenario (0.900 Hit Rate, MTTC 3.00).** The
+  customer refuses to narrow one attribute and we have no special handling
+  beyond marking it settled. With only 10 such sessions the estimate is noisy.
+- **`intent_override` MTTC (3.97) stays high by construction** — the evaluator
   ignores hits before the override turn, so those sessions cannot converge
-  before turn 3-4 no matter how good the agent is.
+  before turn 3-4 however good the agent is. Its Hit Rate is 0.967 and its MRR
+  (0.815) is our best of any scenario.
 - **Constraint parsing is marker-based.** It handles the disclosure phrasings we
   observed plus common natural equivalents, but a paraphrase outside that set
   yields nothing. A small LLM extraction call is the obvious upgrade.

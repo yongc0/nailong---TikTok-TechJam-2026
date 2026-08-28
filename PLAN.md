@@ -48,7 +48,7 @@ updated" within the hacking window per the Devpost rules).
 - `starter/agent.py` now re-exports the root `agent.py`; the original weak
   baseline is preserved as `starter/agent_bm25_baseline.py`. The evaluator
   stays unmodified.
-- 19 tests pass: `python3 -m pytest tests/ -q`
+- 21 tests pass: `python3 -m pytest tests/ -q`
 
 Run it yourself (~18s, writes `results.json`):
 ```
@@ -258,30 +258,51 @@ private run on the paid tier is about $0.33 — the obstacle is that
 `docs/submission_rules.md` warns network access may be disabled at scoring
 time, so an LLM cannot sit on the scored path regardless.
 
-## Revised priorities (after the Aug 26 measurements)
+## What is left, in expected-value order
 
-The original build order assumed dense retrieval and LLM reranking were
-core. The 1.7%-vs-85% finding says otherwise: dialogue extraction carries
-the score, and it is already working without either. Reordered by expected
-value:
+Every priority in the earlier version of this section has now been done or
+ruled out on evidence: `intent_override` went 0.433 -> 0.967, `buying`
+0.563 -> 0.988, MRR 0.407 -> 0.670, and the LLM reranker was tested and
+rejected. Current standing:
 
-1. **`intent_override` (0.433, weakest scenario, 30 sessions).** Erasure is
-   currently coarse — it wipes all descriptive constraints instead of only
-   the contradicted ones.
-2. **MRR (0.407).** Targets are often retrieved but not ranked first. This
-   is the clearest place an LLM reranker earns its cost, and it is 30% of
-   the score.
-3. **`buying` (0.563)** underperforms `browsing` (0.838), which is
-   counter-intuitive since buying sessions disclose a constraint up front.
-   Worth tracing.
-4. **Constraint parsing coverage.** Marker-based; a paraphrase outside the
-   known set yields nothing. A small LLM extraction call is the obvious fix.
-5. **Dense retrieval — now optional.** Only worth it if it lifts Hit Rate
-   beyond what keyword retrieval already reaches. Measure before building.
+| scenario | n | Hit@10 | MRR | MTTC |
+|---|---|---|---|---|
+| browsing | 80 | 1.000 | 0.591 | 1.46 |
+| buying | 80 | 0.988 | 0.691 | 1.36 |
+| intent_override | 30 | 0.967 | 0.815 | 3.97 |
+| boundary | 10 | 0.900 | 0.692 | 3.00 |
 
-Keep the offline path intact: anything added on the LLM side must degrade
-gracefully to the current deterministic behaviour, per
-`docs/submission_rules.md`.
+197/200 sessions hit; 104 at rank 1, 93 at ranks 2-10; 3 misses (one each
+in buying, intent_override, boundary).
+
+**1. Deliverables — the only genuinely urgent work.** Devpost writeup,
+demo video, README team names. These carry real judging weight (Presentation
+10%, and the writeup shapes Innovation 20%) and none of them are started.
+An unfinished submission costs more than any remaining tenth of a point.
+
+**2. A learned ranker (LTR) — the last real score lever, and a genuine
+gamble.** All +0.095 of remaining headroom is in MRR. But with 197/200
+already hit and only 200 training sessions, the risk of a fitted model
+failing to transfer to the private set now rivals the upside. If attempted:
+validate with GroupKFold BY SESSION, judge it on cross-validated gain only,
+ship it behind a fallback to the current hand-scored ranking, and drop it if
+the CV gain is under ~0.02.
+
+**3. `boundary` (0.900, MTTC 3.00) — our weakest scenario, but only 10
+sessions.** Any tuning against it risks fitting noise. Treat carefully.
+
+**4. Constraint-parsing coverage.** Marker-based; a paraphrase outside the
+known set yields nothing. This is the one place an LLM would plausibly beat
+us — extraction, not ranking — but it would put the network on the scored
+path, which Phase 3.0 argues against.
+
+**Ruled out, with evidence:** LLM reranking (Phase 3.0, projected -0.011),
+additive personalization (Phase 2c, -0.036 at weight 1.0), and dense
+retrieval (retrieval is saturated — the 3 remaining misses are ranking
+failures, not coverage failures).
+
+Whatever is added, keep the scored path offline and deterministic: it costs
+nothing today and removes all dependence on network access at scoring time.
 
 ## Original build order (kept for reference)
 

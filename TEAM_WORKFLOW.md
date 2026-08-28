@@ -19,13 +19,19 @@ src/
   state.py                 ✅ P1 — slots, Intent Override, Boundary, question choice
   intent.py                ✅ P1 — Buying/Browsing router + override detection
   retrieval_filter.py      ✅ P2 — structured/attribute-match retrieval (Route A)
-  retrieval_dense.py       ⬜ P3 — embeddings + candidate retrieval (Route B)
-  fusion_rerank.py         ⬜ P3 — RRF fusion + LLM/cross-encoder rerank
+  retrieval_dense.py       ⬜ P3 — embeddings (Route B) — deliberately unbuilt, see below
+  fusion_rerank.py         ⬜ P3 — fusion + LLM rerank — deliberately unbuilt, see below
   personalization.py       ✅ P4 — long-term profile prior (tie-break only)
 tests/test_pipeline.py     ✅ 21 tests, run with `python3 -m pytest tests/ -q`
 starter/agent.py           ✅ re-exports root agent.py so the evaluator runs unmodified
 starter/agent_bm25_baseline.py  the original weak baseline, preserved for comparison
 ```
+
+The two remaining stubs are **not a backlog**. Retrieval is saturated (197/200
+sessions hit; the 3 failures are ranking, not coverage), and an LLM reranker was
+built, measured and rejected in Phase 3.0 — it projected **-0.011**
+TechnicalScore because it demoted already-correct sessions. Do not implement
+either without new evidence; see `PLAN.md`.
 
 `contracts.py`, `catalog.py` and `attributes.py` are **shared infrastructure**,
 not owned by one person — both retrieval routes need the same 50k-product
@@ -101,34 +107,47 @@ Full detail and the measurements behind the design are in `PLAN.md`.
 2. Run `python3 -m evaluator.local_evaluator` and confirm you get
    `0.875866`. If you get something else, say so before changing anything.
 3. Run `python3 -m pytest tests/ -q` — 21 tests should pass.
-4. **Read the four measurements in `PLAN.md`** before proposing changes.
-   Two of them are counter-intuitive (asking questions is free; `budget`
-   and `brand` are worth zero) and both were expensive to discover.
+4. **Read the measurements in `PLAN.md`** before proposing changes. Several
+   are counter-intuitive and were expensive to discover: asking questions is
+   free; `budget` and `brand` yield nothing; an LLM reranker makes things
+   worse; and boosting on `preference_tags` hurts despite looking like real
+   signal.
 
 ### Highest-value work now, in order
 
-Priorities changed after the measurements — dense retrieval and LLM
-reranking are no longer core. See "Revised priorities" in `PLAN.md`:
+**1. Deliverables — the only urgent work left.** Devpost writeup, demo video,
+README team names. None are started, and they carry real judging weight
+(Presentation 10%, and the writeup shapes Innovation 20%). An unfinished
+submission costs far more than any remaining tenth of a point. **Whoever is
+free should start here, not on the model.**
 
-1. **A learned ranker.** When we miss, the target is still in the candidate
-   pool 99% of the time — just ranked too low. Pointwise learning-to-rank
-   over the existing pool is the biggest remaining win, and unlike an LLM it
-   keeps the pipeline offline. Validate with GroupKFold **by session**: 200
-   queries is thin, and public/private use different products.
-2. **Richer ranking features first** — token overlap with the title,
-   `average_rating`, `rating_number`, category-path depth. Often captures
-   most of the gain before any model is trained.
-3. **`boundary` (0.700, 10 sessions)** — weakest scenario now, though the
-   sample is small enough that the estimate is noisy.
-4. **Config tuning** is done for the three live knobs (results recorded in
-   `config.py`); the remaining knobs belong to modules that are still stubs.
+**2. A learned ranker — the last score lever, and a genuine gamble.** All
++0.095 of remaining headroom is in MRR. But with 197/200 already hit and only
+200 training sessions, the risk of a fitted model failing on the private set
+now rivals the upside. If attempted: GroupKFold **by session**, judge on
+cross-validated gain only, ship behind a fallback, and drop it if CV gain is
+under ~0.02.
+
+**3. `boundary`** — weakest scenario (0.900 Hit@10, MTTC 3.00) but only 10
+sessions, so tuning against it risks fitting noise.
+
+**Ruled out, with evidence — please read before proposing these again:**
+LLM reranking (projected **-0.011**), additive personalization (**-0.036** at
+weight 1.0), and dense retrieval (retrieval is saturated). All three are
+documented with reproducible measurements in `PLAN.md`.
+
+**Config tuning is done** for every live knob; sweep results are recorded
+inline in `config.py`. The unswept knobs belong to the two stubs.
 
 ### Still worth asking at the Aug 28 workshop (4:00–4:45pm SGT)
 
-- Is network access available at official scoring time? *(Our scored path is
-  offline either way, so this is now a question about whether adding an LLM
-  stage is safe — not a risk to what already works.)*
-- Any constraint on precomputing embeddings over the frozen catalog?
+- Is network access available at official scoring time? *(Now low-stakes: our
+  scored path is offline, and Phase 3.0 measured an LLM stage as net-negative
+  anyway, so the answer changes nothing we plan to ship.)*
+- Anything to know about how the private 800 sessions were sampled? Our
+  popularity prior assumes the same 5-core leave-last-out construction as the
+  public set — that assumption is worth confirming, since it is the one place
+  our ranking leans on the benchmark's design.
 
 ## 6. Submission ownership (from `docs/submission_rules.md`, tracked in PLAN.md)
 
