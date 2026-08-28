@@ -35,11 +35,11 @@ updated" within the hacking window per the Devpost rules).
   `max_completion_tokens` before the answer, so a 20-token cap returns an
   EMPTY string. Budget 200+.
 
-**Aug 26 — working agent, TechnicalScore 0.562 (5.3× baseline)**
+**Aug 26 — working agent, TechnicalScore 0.744 (7.0× baseline)**
 
-- HitRate@10 0.655, MRR 0.407, MTTC 5.385
-- By scenario: browsing 0.838, boundary 0.600 (was 0.000), buying 0.563,
-  intent_override 0.433
+- HitRate@10 0.870, MRR 0.566, MTTC 4.070
+- By scenario (Hit Rate@10): buying 0.887, browsing 0.887,
+  intent_override 0.833, boundary 0.700 (was 0.000)
 - Implemented: `src/catalog.py`, `src/attributes.py`, `src/intent.py`,
   `src/state.py`, `src/retrieval_filter.py`, root `agent.py`
 - **No LLM used.** Fully offline and deterministic, which satisfies the
@@ -47,7 +47,7 @@ updated" within the hacking window per the Devpost rules).
 - `starter/agent.py` now re-exports the root `agent.py`; the original weak
   baseline is preserved as `starter/agent_bm25_baseline.py`. The evaluator
   stays unmodified.
-- 17 tests pass: `python3 -m pytest tests/ -q`
+- 19 tests pass: `python3 -m pytest tests/ -q`
 
 Run it yourself (~18s, writes `results.json`):
 ```
@@ -118,6 +118,36 @@ retrieval strategy weighting, not a hard gate.
 - Hard cap: 10 turns, forced zero score if exceeded — the agent MUST return
   *something* (even a best-guess top-10) well before turn 10 rather than
   keep clarifying.
+
+## Phase 1 results (Aug 26) — 0.562 → 0.744
+
+Three changes, measured one at a time:
+
+1. **Bucket exhaustion bug: 0.562 → 0.728.** Receiving one constraint from
+   an attribute marked that whole attribute settled, so a session opening
+   with "A key requirement is: Material:alloy" (classified `feature`) never
+   asked `feature` again and never learned what identified the product.
+   The customer releases at most two constraints per question and withholds
+   the rest — one answer does not empty a bucket. Now only an explicit
+   refusal settles one. `buying` went 0.563 → 0.887.
+2. **Override retraction: 0.728 → 0.744.** An override retracts the ONE
+   preference the shopper opened with, not everything learned since. We now
+   drop only the first disclosed constraint and keep the rest.
+   `intent_override` Hit Rate went 0.733 → 0.833.
+3. **Config sweep: no change — the guesses were already optimal**, but they
+   are now measured rather than assumed. Results recorded inline in
+   `config.py`. Notable: `POOL_SIZE` has no effect anywhere between 300 and
+   3000, and `CONFIDENT_MARGIN` above 0.35 changes nothing, meaning the
+   agent effectively always asks — the correct policy when questions cost
+   nothing.
+
+### Where the remaining loss is
+
+Of the misses at 0.562, **99% had the target still inside the candidate
+pool** — 67% at rank 11-50, 32% at rank 51-800, only 1 absent entirely.
+Retrieval is close to saturated; ranking is the remaining problem. That is
+what makes a learned ranker (not an LLM, which would break the offline
+guarantee) the highest-value next step.
 
 ## Revised priorities (after the Aug 26 measurements)
 

@@ -5,9 +5,9 @@ teammates without Claude Code access run experiments (edit a value, re-run
 `python3 -m evaluator.local_evaluator`, compare TechnicalScore) without
 touching pipeline logic.
 
-Values below are placeholders/starting guesses, not tuned. Expect every
-number here to change once the hacking window opens and you're looking at
-real scenario_metrics breakdowns.
+Knobs marked SWEPT below have been tuned by coordinate descent against the
+200-session public set; the recorded numbers are their measured effect on
+TechnicalScore. Unmarked knobs belong to modules that are still stubs.
 """
 
 # --- Over-generality / clarification trigger (state.py, P1) ---
@@ -18,7 +18,15 @@ MAX_CLARIFYING_TURNS = 4        # force a best-guess return after this many clar
 # (0..1). Asking is free in this harness — the evaluator scores
 # recommendations before it reads ask_attribute — so the agent asks by
 # default and this threshold only decides when it has converged enough to
-# go quiet. Lower it to ask less.
+# go quiet.
+#
+# SWEPT: 0.0 -> 0.1343 (never asks; collapses to baseline behaviour),
+# 0.15 -> 0.7339, 0.35 -> 0.7435, 0.60 and 0.95 -> 0.7435 (identical).
+# Values above 0.35 change nothing, meaning observed confidence rarely
+# exceeds it and the gate is effectively "always ask" — which is the
+# correct policy when questions are free. Kept as a safety valve rather
+# than removed, so a future ranker that produces genuinely confident
+# distributions can stop asking without a code change.
 CONFIDENT_MARGIN = 0.35
 
 # Order to ask about when several slots are still unknown.
@@ -49,10 +57,18 @@ ATTRIBUTE_PRIORITY = [
 # How many keyword hits to rescore. Much wider than top_k on purpose: the
 # target often ranks poorly on raw BM25 but well once verified attribute
 # matches are counted, so it must survive into rescoring to be findable.
+# SWEPT: 300 / 800 / 1500 / 3000 all score 0.7435 — the target is always
+# well inside the first few hundred BM25 hits, so pool depth is not a
+# constraint. Kept at 800 for margin on the unseen private set.
 POOL_SIZE = 800
 # Flat score bonus per verified attribute match, added to the 0..1
 # normalised keyword score. Raise it to trust structured matches more,
 # lower it to trust keyword relevance more.
+#
+# SWEPT: 0.0 -> 0.7319, 0.25 -> 0.7435, 0.5 -> 0.7435, 1.0 -> 0.7390,
+# 2.0 -> 0.7390. Flat optimum between 0.25 and 0.5; over-trusting
+# structured matches costs a little, since only material/colour/budget/
+# brand are verifiable at all.
 VERIFIED_MATCH_BONUS = 0.5
 # Budget is a proximity target ("budget around $X"), not a ceiling — this is
 # the fraction of the stated price still counted as a match.

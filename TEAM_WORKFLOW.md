@@ -22,7 +22,7 @@ src/
   retrieval_dense.py       ⬜ P3 — embeddings + candidate retrieval (Route B)
   fusion_rerank.py         ⬜ P3 — RRF fusion + LLM/cross-encoder rerank
   personalization.py       ⬜ P4 — user_profile-based ranking boost
-tests/test_pipeline.py     ✅ 17 tests, run with `python3 -m pytest tests/ -q`
+tests/test_pipeline.py     ✅ 19 tests, run with `python3 -m pytest tests/ -q`
 starter/agent.py           ✅ re-exports root agent.py so the evaluator runs unmodified
 starter/agent_bm25_baseline.py  the original weak baseline, preserved for comparison
 ```
@@ -90,7 +90,7 @@ and reviewing after the fact via the commit diff on GitHub.
 
 ## 5. Where we are and what's next
 
-**Status: working agent on `main`, TechnicalScore 0.562 vs 0.107 baseline.**
+**Status: working agent on `main`, TechnicalScore 0.744 vs 0.107 baseline.**
 Full detail and the measurements behind the design are in `PLAN.md`.
 
 ### Everyone, before you write any code
@@ -99,8 +99,8 @@ Full detail and the measurements behind the design are in `PLAN.md`.
    already (`README.md` has the commands). `data/catalog.jsonl` is
    git-ignored, so it does **not** arrive with `git clone`.
 2. Run `python3 -m evaluator.local_evaluator` and confirm you get
-   `0.561976`. If you get something else, say so before changing anything.
-3. Run `python3 -m pytest tests/ -q` — 17 tests should pass.
+   `0.743549`. If you get something else, say so before changing anything.
+3. Run `python3 -m pytest tests/ -q` — 19 tests should pass.
 4. **Read the four measurements in `PLAN.md`** before proposing changes.
    Two of them are counter-intuitive (asking questions is free; `budget`
    and `brand` are worth zero) and both were expensive to discover.
@@ -110,15 +110,18 @@ Full detail and the measurements behind the design are in `PLAN.md`.
 Priorities changed after the measurements — dense retrieval and LLM
 reranking are no longer core. See "Revised priorities" in `PLAN.md`:
 
-1. **`intent_override`** — weakest scenario at 0.433. Slot erasure is coarse.
-2. **MRR (0.407)** — targets are retrieved but not ranked first. This is
-   where an LLM reranker would actually earn its cost, and it is 30% of the
-   score.
-3. **`buying` (0.563) underperforms `browsing` (0.838)** despite disclosing
-   a constraint up front. Nobody has traced why yet — good first task.
-4. **Tuning `config.py`** — no code changes needed, just edit a value,
-   re-run the evaluator, report the delta. `CONFIDENT_MARGIN`,
-   `VERIFIED_MATCH_BONUS`, and `POOL_SIZE` are all unturned guesses.
+1. **A learned ranker.** When we miss, the target is still in the candidate
+   pool 99% of the time — just ranked too low. Pointwise learning-to-rank
+   over the existing pool is the biggest remaining win, and unlike an LLM it
+   keeps the pipeline offline. Validate with GroupKFold **by session**: 200
+   queries is thin, and public/private use different products.
+2. **Richer ranking features first** — token overlap with the title,
+   `average_rating`, `rating_number`, category-path depth. Often captures
+   most of the gain before any model is trained.
+3. **`boundary` (0.700, 10 sessions)** — weakest scenario now, though the
+   sample is small enough that the estimate is noisy.
+4. **Config tuning** is done for the three live knobs (results recorded in
+   `config.py`); the remaining knobs belong to modules that are still stubs.
 
 ### Still worth asking at the Aug 28 workshop (4:00–4:45pm SGT)
 

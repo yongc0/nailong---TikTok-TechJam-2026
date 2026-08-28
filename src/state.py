@@ -113,18 +113,29 @@ def update_slots(state: SessionState, user_message: str) -> SessionState:
     if "ask me about one specific attribute" in user_message.lower():
         return state
 
-    # --- Intent Override: replace, don't merge ---------------------------
+    # --- Intent Override: retract the stated preference, keep the rest ----
     if detect_override(user_message):
-        # Wipe the descriptive constraints that the shopper is retracting.
-        # `category` deliberately survives: the override message supplies a
-        # new requirement, not a new product category, and re-deriving the
-        # category from scratch would lose the one signal we got for free
-        # in turn 1.
+        # "Actually, ignore my earlier preference. What I need is: X"
+        # retracts ONE preference — the one the shopper opened with — and
+        # replaces it. It does not invalidate everything learned since.
+        #
+        # So we drop only the first constraint disclosed (the opening
+        # preference) and rebuild state from what remains. Wiping the whole
+        # session, as an earlier version did, threw away constraints the
+        # shopper never retracted and forced the dialogue to start over,
+        # which cost both Hit Rate and turns.
+        #
+        # `category` survives regardless: an override supplies a new
+        # requirement, not a new product category.
         preserved_category = state.slots.category
+        retained = state.disclosed_text[1:]
         state.slots = Slots(category=preserved_category)
         state.disclosed_text = []
-        # The retracted attributes become askable again — the shopper's
-        # answers to them are no longer valid.
+        for constraint in retained:
+            _assign_slot(state.slots, classify_constraint(constraint), constraint)
+            state.disclosed_text.append(constraint)
+        # Attributes become askable again: the shopper has just changed what
+        # they want, so an earlier "no preference" may no longer hold.
         state.disclosed_attributes = set()
         state.asked_attributes = set()
 
@@ -142,7 +153,16 @@ def update_slots(state: SessionState, user_message: str) -> SessionState:
     for constraint in _split_constraints(user_message):
         attribute = classify_constraint(constraint)
         _assign_slot(state.slots, attribute, constraint)
-        state.disclosed_attributes.add(attribute)
+        # Deliberately NOT marking `attribute` disclosed here. Receiving one
+        # constraint from a bucket does not empty that bucket: the customer
+        # releases at most two constraints per question and withholds the
+        # rest, so the same attribute usually still has more to give. An
+        # earlier version marked it settled on first receipt, which meant a
+        # session opening with "A key requirement is: Material:alloy"
+        # (classified `feature`) never asked `feature` again and so never
+        # learned the constraints that actually identified the product.
+        # A bucket is only settled when the customer explicitly declines it,
+        # which NO_PREFERENCE_RE handles above.
         if constraint not in state.disclosed_text:
             state.disclosed_text.append(constraint)
 
@@ -182,12 +202,17 @@ def choose_attribute_to_ask(state: SessionState) -> AttributeName | None:
     Walks config.ATTRIBUTE_PRIORITY, which is ordered by measured yield
     (feature 96% of sessions, material 76.5%, colour 25.5%...) and already
     excludes the attributes that can never yield — budget, brand and
-    category. Never repeats an attribute already asked or settled.
+    category.
+
+    Asks the highest-yield bucket repeatedly until the customer says it is
+    empty, rather than moving on after one answer. Since a question costs
+    nothing when the recommendation already hits, re-asking a 96%-yield
+    attribute beats moving to a 4.5%-yield one. Termination is guaranteed:
+    an exhausted bucket returns "I don't have an additional preference for
+    X", which marks it settled.
     """
     for attribute in config.ATTRIBUTE_PRIORITY:
-        if attribute in state.asked_attributes:
-            continue
         if attribute in state.disclosed_attributes:
-            continue
+            continue  # customer explicitly has no preference here
         return attribute  # type: ignore[return-value]
     return None

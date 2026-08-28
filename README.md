@@ -4,20 +4,20 @@ TikTok TechJam 2026, Track 4. A multi-turn shopping agent that finds a customer'
 intended product in a 50,000-item Amazon catalog by asking as few questions as
 possible.
 
-**Current score on the 200-session public set: TechnicalScore 0.562** — 5.3× the
+**Current score on the 200-session public set: TechnicalScore 0.744** — 7.0× the
 provided BM25 baseline (0.107), using **no LLM and no third-party runtime
 dependencies**.
 
 | Metric | Weak BM25 baseline | This agent | Change |
 |---|---|---|---|
-| Hit Rate@10 | 0.125 | **0.655** | +424% |
-| MRR | 0.068 | **0.407** | +499% |
-| MTTC (turns to conversion) | 9.81 | **5.385** | −4.4 turns |
-| Efficiency | 0.119 | **0.562** | — |
-| **TechnicalScore** | **0.107** | **0.562** | **5.3×** |
+| Hit Rate@10 | 0.125 | **0.870** | +596% |
+| MRR | 0.068 | **0.566** | +732% |
+| MTTC (turns to conversion) | 9.81 | **4.070** | −5.7 turns |
+| Efficiency | 0.119 | **0.693** | — |
+| **TechnicalScore** | **0.107** | **0.744** | **7.0×** |
 
-Per scenario: browsing **0.838** · boundary **0.600** (baseline 0.000) ·
-buying **0.563** · intent_override **0.433**.
+Per-scenario Hit Rate@10: buying **0.887** · browsing **0.887** ·
+intent_override **0.833** · boundary **0.700** (baseline 0.000).
 
 ## The core insight
 
@@ -42,7 +42,7 @@ losing what they said. Our architecture follows from that finding.
 ```
 user message
    │
-   ├─ state.update_slots ......... accumulate constraints; erase on Intent
+   ├─ state.update_slots ......... accumulate constraints; retract on Intent
    │                               Override; mark Boundary attributes settled
    ├─ intent.classify_intent ..... Buying vs Browsing (rules, no LLM)
    ├─ retrieval_filter.retrieve .. wide keyword pool → rescore by verified
@@ -61,6 +61,12 @@ recommendation already hits. There is never a reason to ask without also
 recommending. The interesting problem is therefore not *when to ask* but
 *when to stop* — we go quiet once the top candidate dominates the shortlist
 (`config.CONFIDENT_MARGIN`).
+
+Because questions are free, we also **drain the highest-yield attribute before
+moving on** rather than asking each once. The customer releases at most two
+constraints per question and withholds the rest, so one answer does not empty
+a bucket — re-asking a 96%-yield attribute beats moving to a 4.5%-yield one.
+Treating a bucket as settled on first answer was costing us 0.17 TechnicalScore.
 
 **2. Questions are ordered by measured yield, not intuition.** Classifying
 every public-set target's disclosable constraints through the evaluator's own
@@ -119,7 +125,7 @@ python3 -m evaluator.local_evaluator
 ```
 
 Runs all 200 public sessions in ~18s on a laptop and writes `results.json`.
-The printed `recommended_technical_score` should read `0.561976`.
+The printed `recommended_technical_score` should read `0.743549`.
 
 Run the tests:
 
@@ -168,15 +174,19 @@ Token usage reported to the evaluator is currently `0` for the same reason.
 
 - **Dense retrieval and LLM reranking are not implemented yet.** They were
   planned as core, but the 85%-with-full-disclosure measurement showed dialogue
-  extraction mattered far more, so they were deprioritised. The remaining
-  headroom in MRR (0.407 — targets are often found but not ranked first) is the
-  clearest use for a reranker.
+  extraction mattered far more, so they were deprioritised. Retrieval is close
+  to saturated: when the agent misses, the target is still inside the candidate
+  pool 99% of the time, just ranked too low. A learned ranker over the existing
+  pool is the clearest remaining win, and unlike an LLM it keeps the pipeline
+  offline.
 - **`intent.py` is built but barely load-bearing.** Intent is classified and
   tracked, but does not yet change retrieval weighting between routes.
-- **`intent_override` is our weakest scenario (0.433).** Partly structural — the
-  evaluator ignores hits before the override turn, so MTTC there cannot fall
-  below ~3 — but our erasure heuristic is also coarse: it wipes all descriptive
-  constraints rather than only the contradicted ones.
+- **`boundary` is now our weakest scenario (0.700 Hit Rate, 10 sessions).** The
+  customer refuses to narrow one attribute, and we have no special handling
+  beyond marking it settled. The sample is small, so the estimate is noisy.
+- **`intent_override` MTTC (5.43) stays high by construction** — the evaluator
+  ignores hits before the override turn, so those sessions cannot converge
+  before turn 3-4 no matter how good the agent is.
 - **Constraint parsing is marker-based.** It handles the disclosure phrasings we
   observed plus common natural equivalents, but a paraphrase outside that set
   yields nothing. A small LLM extraction call is the obvious upgrade.

@@ -86,29 +86,58 @@ def test_boundary_marks_attribute_settled_without_storing_a_value():
     assert state.slots.material is None
 
 
-def test_override_erases_constraints_but_keeps_category():
+def test_override_retracts_only_the_opening_preference():
+    """An override replaces the preference the shopper opened with; it does
+    not invalidate everything learned since. Wiping the whole session threw
+    away constraints that were never retracted."""
     state = _state()
     update_slots(state, "I'm looking for boots. A key requirement is: leather.")
-    assert state.disclosed_text
+    update_slots(state, "For that, what matters is: Lace-up closure; Rubber sole.")
+    assert len(state.disclosed_text) == 3
+
     update_slots(state, "Actually, ignore my earlier preference. What I need is: canvas.")
-    assert state.slots.category == "boots"
-    assert "leather" not in " ".join(state.disclosed_text)
+    joined = " ".join(state.disclosed_text)
+    assert state.slots.category == "boots"      # category survives
+    assert "leather" not in joined              # the opening preference is dropped
+    assert "Lace-up closure" in joined          # later constraints are kept
+    assert "canvas" in joined                   # the replacement is recorded
 
 
 def test_never_asks_a_zero_yield_attribute():
     """budget/brand/category yield nothing in this harness — see config."""
     state = _state()
     asked = []
-    for _ in range(10):
+    for _ in range(20):
         attribute = choose_attribute_to_ask(state)
         if attribute is None:
             break
         asked.append(attribute)
-        state.asked_attributes.add(attribute)
+        # Only an explicit refusal settles a bucket.
+        state.disclosed_attributes.add(attribute)
     assert "budget" not in asked
     assert "brand" not in asked
     assert "category" not in asked
     assert asked[0] == "feature"  # highest measured yield
+    assert choose_attribute_to_ask(state) is None  # terminates
+
+
+def test_receiving_a_constraint_does_not_exhaust_its_bucket():
+    """Regression: marking a bucket settled on first receipt meant a session
+    opening with "A key requirement is: Material:alloy" (classified as
+    `feature`) never asked `feature` again, and so never learned the
+    constraints that identified the product. Worth ~0.17 TechnicalScore."""
+    state = _state()
+    update_slots(state, "I'm looking for necklaces. A key requirement is: Material:alloy.")
+    assert state.disclosed_text == ["Material:alloy"]
+    assert state.disclosed_attributes == set()
+    assert choose_attribute_to_ask(state) == "feature"
+
+
+def test_explicit_refusal_does_exhaust_the_bucket():
+    state = _state()
+    update_slots(state, "I don't have an additional preference for feature.")
+    assert "feature" in state.disclosed_attributes
+    assert choose_attribute_to_ask(state) != "feature"
 
 
 # --- retrieval ------------------------------------------------------------
