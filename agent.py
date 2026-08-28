@@ -8,6 +8,7 @@ The pipeline per turn:
       -> state.update_slots        accumulate / override / boundary
       -> intent.classify_intent    buying vs browsing (route weighting)
       -> retrieval_filter.retrieve candidates from everything disclosed
+      -> personalization.boost     long-term profile prior (soft, post-rank)
       -> state.choose_attribute    what to ask next, if anything
       -> {recommendations + ask_attribute}
 
@@ -28,7 +29,9 @@ from pathlib import Path
 import config
 from src.catalog import Catalog
 from src.contracts import SessionState, Slots
+from src.contracts import RankedList
 from src.intent import classify_intent
+from src.personalization import apply_profile_boost
 from src.retrieval_filter import retrieve
 from src.state import choose_attribute_to_ask, should_ask_clarifying_question, update_slots
 
@@ -96,6 +99,12 @@ class Agent:
             rest = candidates[1:top_k] or candidates[1:]
             mean_rest = sum(c.score for c in rest) / len(rest)
             confidence = max(0.0, (top - mean_rest) / top) if top else 0.0
+
+        # Long-term profile prior, applied after ranking so an Intent
+        # Override cannot corrupt it (see src/personalization.py).
+        candidates = apply_profile_boost(
+            RankedList(candidates), self._profiles.get(session_id, {}), self.catalog
+        ).candidates
 
         ask_attribute = None
         if should_ask_clarifying_question(state, confidence):

@@ -117,7 +117,21 @@ matching. A strict `AND` across accumulated constraints returns zero rows often,
 and an empty list is a guaranteed miss for that turn. We `OR`-match into a wide
 pool (800) and rank by how many constraints each product verifiably satisfies.
 
-**5. Budget is proximity, not a ceiling.** Budget is disclosed as *"budget
+**5. The long-term profile breaks ties, and nothing more.** `user_profile`
+describes what the shopper valued across *prior* purchases, so it is kept
+separate from the session's own slots — an Intent Override retracts what they
+said today, but not who they are. The instinct is to add `preference_tags`
+into the score; measured, that is wrong. Tags match the target 1.72× more
+often than a random product, which looks like signal, but against the
+candidates *actually competing in the pool* the lift collapses to 1.12× —
+almost all of it was the tags proxying for category relevance, which coverage
+and category matching already capture far better. Added into the score it
+therefore dilutes a strong signal with a weak one, and every additive weight
+we tried scored worse (0.876 → 0.840 at weight 1.0). So the profile is
+consulted only where the session evidence is genuinely indifferent: it
+reorders exact ties and never outranks a real score lead.
+
+**6. Budget is proximity, not a ceiling.** Budget is disclosed as *"budget
 around $X"* where X is the target's own price, so `<= X` would wrongly reward
 anything cheap. Products with no price are left unmatched but **not penalised** —
 only 21% of the catalog is priced, and treating unknown as failure would demote
@@ -150,7 +164,7 @@ python3 -m evaluator.local_evaluator
 ```
 
 Runs all 200 public sessions in ~18s on a laptop and writes `results.json`.
-The printed `recommended_technical_score` should read `0.875665`.
+The printed `recommended_technical_score` should read `0.875866`.
 
 Run the tests:
 
@@ -172,7 +186,7 @@ src/
   retrieval_filter.py        Route A — attribute-match retrieval
   retrieval_dense.py         Route B — embedding retrieval (not yet implemented)
   fusion_rerank.py           route fusion + LLM rerank (not yet implemented)
-  personalization.py         profile-aware reranking (not yet implemented)
+  personalization.py         long-term profile prior, used as a tie-break
 tests/test_pipeline.py       unit tests for the above
 scripts/test_groq.py         Groq connectivity smoke test
 starter/agent_bm25_baseline.py   the original weak baseline, preserved
@@ -206,6 +220,11 @@ Token usage reported to the evaluator is currently `0` for the same reason.
   offline.
 - **`intent.py` is built but barely load-bearing.** Intent is classified and
   tracked, but does not yet change retrieval weighting between routes.
+- **Personalization is principled but worth almost nothing here (+0.0002,
+  within noise).** The profile is too coarse to separate candidates that
+  already match the session constraints. It earns its place as correct
+  handling of the long-term signal, not as a score contributor, and we would
+  rather say so than overclaim it.
 - **`boundary` is now our weakest scenario (0.700 Hit Rate, 10 sessions).** The
   customer refuses to narrow one attribute, and we have no special handling
   beyond marking it settled. The sample is small, so the estimate is noisy.

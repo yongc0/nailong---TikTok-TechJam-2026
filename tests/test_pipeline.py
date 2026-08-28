@@ -166,3 +166,34 @@ def test_missing_price_is_not_penalised(catalog):
     unpriced = next(a for a in catalog.products if a not in catalog.price)
     from src.retrieval_filter import _matched_attributes
     assert "budget" not in _matched_attributes(catalog, unpriced, Slots(budget=25.0))
+
+
+# --- personalization ------------------------------------------------------
+
+def test_profile_breaks_ties_without_overriding_real_evidence(catalog):
+    """The profile may reorder candidates the session ranking considers
+    equivalent, but must never outrank a candidate with a genuinely better
+    score. Measured rationale in src/personalization.py: preference_tags
+    show a 1.72x lift against a random product but only 1.12x against the
+    candidates actually competing, so treating them as additive evidence
+    dilutes a strong signal with a weak one."""
+    from src.personalization import apply_profile_boost
+    from src.contracts import Candidate, RankedList
+
+    strong = Candidate(parent_asin="STRONG", score=5.0, source="filter")
+    tied_a = Candidate(parent_asin="TIED_A", score=1.0, source="filter")
+    tied_b = Candidate(parent_asin="TIED_B", score=1.0, source="filter")
+    ranked = RankedList([tied_a, tied_b, strong])
+
+    result = apply_profile_boost(ranked, {"preference_tags": ["comfort"]}, catalog)
+    assert result.candidates[0].parent_asin == "STRONG", "a real score lead must survive"
+    assert {c.parent_asin for c in result.candidates[1:]} == {"TIED_A", "TIED_B"}
+
+
+def test_empty_profile_is_a_noop(catalog):
+    from src.personalization import apply_profile_boost
+    from src.contracts import Candidate, RankedList
+
+    order = [Candidate(parent_asin=f"A{i}", score=float(10 - i), source="filter") for i in range(5)]
+    result = apply_profile_boost(RankedList(list(order)), {}, catalog)
+    assert [c.parent_asin for c in result.candidates] == [c.parent_asin for c in order]

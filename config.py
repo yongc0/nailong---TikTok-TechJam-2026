@@ -134,4 +134,11 @@ CLARIFY_REASONING_EFFORT = "low"     # cheap classification/question-picking —
 CLARIFY_MAX_COMPLETION_TOKENS = 200
 
 # --- Personalization (personalization.py, P4) ---
-PROFILE_BOOST_WEIGHT = 0.15     # how much preference_tags overlap nudges final ranking score (soft prior, never a hard filter)
+# Consult the long-term profile only to break ties in the session ranking,
+# never as an additive score term — see src/personalization.py for the
+# measurement that forced this design.
+PROFILE_TIE_BREAK = True
+# Scores within this distance count as tied. Too large and the weak profile
+# signal starts overriding real session evidence; too small and nothing ever
+# ties.
+PROFILE_TIE_QUANTUM = 0.01

@@ -21,8 +21,8 @@ src/
   retrieval_filter.py      ✅ P2 — structured/attribute-match retrieval (Route A)
   retrieval_dense.py       ⬜ P3 — embeddings + candidate retrieval (Route B)
   fusion_rerank.py         ⬜ P3 — RRF fusion + LLM/cross-encoder rerank
-  personalization.py       ⬜ P4 — user_profile-based ranking boost
-tests/test_pipeline.py     ✅ 19 tests, run with `python3 -m pytest tests/ -q`
+  personalization.py       ✅ P4 — long-term profile prior (tie-break only)
+tests/test_pipeline.py     ✅ 21 tests, run with `python3 -m pytest tests/ -q`
 starter/agent.py           ✅ re-exports root agent.py so the evaluator runs unmodified
 starter/agent_bm25_baseline.py  the original weak baseline, preserved for comparison
 ```
@@ -99,8 +99,8 @@ Full detail and the measurements behind the design are in `PLAN.md`.
    already (`README.md` has the commands). `data/catalog.jsonl` is
    git-ignored, so it does **not** arrive with `git clone`.
 2. Run `python3 -m evaluator.local_evaluator` and confirm you get
-   `0.875665`. If you get something else, say so before changing anything.
-3. Run `python3 -m pytest tests/ -q` — 19 tests should pass.
+   `0.875866`. If you get something else, say so before changing anything.
+3. Run `python3 -m pytest tests/ -q` — 21 tests should pass.
 4. **Read the four measurements in `PLAN.md`** before proposing changes.
    Two of them are counter-intuitive (asking questions is free; `budget`
    and `brand` are worth zero) and both were expensive to discover.

@@ -182,6 +182,35 @@ learned ranker targets exactly that — but with 197/200 already hit and only
 200 training sessions, the risk of a fitted model failing to transfer now
 rivals the upside. Decide on cross-validated evidence, not train-set gain.
 
+## Phase 2c — personalization (Aug 26): principled, but worth ~nothing
+
+`user_profile` was entirely unused, leaving Pillar III (Self-Evolution /
+Dynamic Context Programming) unaddressed. Now implemented in
+`src/personalization.py` — and the measurement is more interesting than the
+score change.
+
+Naively boosting candidates by `preference_tags` overlap **hurt at every
+weight** (0.8757 -> 0.8746 at 0.05, -> 0.8399 at 1.0). Why:
+
+- tags match the TARGET 1.72x more often than a RANDOM catalogue product,
+  which looks like real signal;
+- but against the candidates ACTUALLY COMPETING in our pool, the lift is
+  only 1.12x.
+
+Almost all the apparent signal was the tags proxying for category relevance
+— which constraint coverage and category matching already capture far
+better. Added to the score it dilutes a strong signal with a weak one.
+
+**Generalisable lesson: a feature with real lift against a random baseline
+can be worthless against a strong one. Always measure against the candidates
+you will actually be ranking.**
+
+Redesigned to consult the profile only where the session evidence is
+indifferent — it reorders exact ties and never outranks a real score lead.
+Net effect +0.0002, i.e. noise. Kept because it is the correct treatment of
+the long-term signal and it addresses the pillar, NOT because it moves the
+score — and the writeup should say exactly that.
+
 ## Revised priorities (after the Aug 26 measurements)
 
 The original build order assumed dense retrieval and LLM reranking were
