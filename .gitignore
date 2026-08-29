@@ -21,21 +21,7 @@ results/
 # Phase 3.0 experiment output — regenerate with scripts/validate_llm_rerank.py
 results_llm_validation.json
 
-# Deck build artefacts — rebuild with: cd deck && node build_deck.js
-deck/node_modules/
-deck/package-lock.json
-deck/package.json
-deck/slide-*.jpg
-deck/phototest*.jpg
-deck/*.pdf
-# Team photos are personal data — keep them out of a public repo.
-deck/photos/*.jpg
-deck/photos/*.jpeg
-deck/photos/*.png
-
-# Word doc build artefacts — rebuild with: cd doc && node build_doc.js
-doc/node_modules/
-doc/package-lock.json
-doc/package.json
-doc/page-*.jpg
-doc/*.pdf
+# Presentation and write-up sources live outside the code submission.
+# Regenerate with: cd deck && node build_deck.js   |   cd doc && node build_doc.js
+deck/
+doc/
