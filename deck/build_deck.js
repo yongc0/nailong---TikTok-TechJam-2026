@@ -7,10 +7,10 @@ const path = require("path");
 // without a photo file renders a monogram avatar instead, so the slide always
 // looks finished — add photos as they arrive and re-run this script.
 const TEAM = [
-  { name: "Qiao Enn",   role: "Dialog & Retrieval",   owns: "State machine, intent routing, and the constraint-coverage ranker.", photo: "p1.jpg" },
-  { name: "Teammate 2", role: "Evaluation",           owns: "Metric analysis, weight sweeps, and the LLM rerank experiment.",     photo: "p2.jpg" },
-  { name: "Teammate 3", role: "Retrieval & Ranking",  owns: "Catalogue index, attribute extraction, popularity and category priors.", photo: "p3.jpg" },
-  { name: "Teammate 4", role: "Integration",          owns: "Agent glue, API contract conformance, tests, and submission.",       photo: "p4.jpg" },
+  { name: "Qiao Enn",   role: "Dialogue",    owns: "Slot accumulation, override retraction, and choosing what to ask next.",       photo: "p1.jpg" },
+  { name: "Teammate 2", role: "Evaluation",  owns: "Metric analysis, weight sweeps, and the experiments that killed three ideas.", photo: "p2.jpg" },
+  { name: "Teammate 3", role: "Retrieval",   owns: "Catalogue index, attribute extraction, and the constraint-coverage ranker.",   photo: "p3.jpg" },
+  { name: "Teammate 4", role: "Integration", owns: "Agent glue, contract conformance, 24 tests, and the submission package.",      photo: "p4.jpg" },
 ];
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -310,25 +310,26 @@ function card(s, x, y, w, h, fill = MIST) {
     fontFace: B, fontSize: 12, bold: true, color: MINT, charSpacing: 2 });
   s.addText("What we chose not to ship", { x: M, y: 0.8, w: 11.9, h: 0.7, isTextBox: true,
     margin: 0, fontFace: H, fontSize: 34, bold: true, color: WHITE });
-  s.addText("All three were in our original plan. We built enough of each to measure it, then cut it.",
+  s.addText("All four were in our original plan. We built enough of each to measure it, then cut it.",
     { x: M, y: 1.54, w: 11.9, h: 0.4, isTextBox: true, margin: 0,
       fontFace: B, fontSize: 15, color: FOG });
 
   const items = [
-    ["LLM reranker", "-0.011", "Tested on 40 real sessions. It lifted ambiguous cases (+0.041 MRR) but demoted already-correct ones (-0.107). 104 of 200 sessions are already rank-1 and can only lose."],
-    ["Profile boosting", "-0.036", "preference_tags match the target 1.72x more than a random product — but only 1.12x against the candidates actually competing. Real lift against the wrong baseline."],
-    ["Dense retrieval", "no gain", "Retrieval saturated at 197/200. The three remaining failures are ranking misses, not coverage misses, so a second route has nothing to add."],
+    ["LLM reranker", "-0.011", "Tested on 40 real sessions. Lifted ambiguous cases (+0.041 MRR) but demoted already-correct ones (-0.107). Half our sessions are already rank-1 and can only lose."],
+    ["Profile boosting", "-0.036", "preference_tags match the target 1.72x more than a random product — but only 1.12x against the candidates actually competing."],
+    ["Title weighting", "-0.022", "Rewarding a requirement named in the title. Principled, but constraints come from the features and details fields, not titles."],
+    ["Dense retrieval", "no gain", "Retrieval saturated at 197/200. The three failures are ranking misses, not coverage misses, so a second route adds nothing."],
   ];
   items.forEach(([t, d, x2], i) => {
-    const x = M + i * 4.13;
-    s.addShape(pres.ShapeType.roundRect, { x, y: 2.2, w: 3.87, h: 3.24, rectRadius: 0.06,
+    const x = M + i * 3.09;
+    s.addShape(pres.ShapeType.roundRect, { x, y: 2.2, w: 2.87, h: 3.24, rectRadius: 0.06,
       fill: { color: INK2 }, line: { color: INK2 } });
-    s.addText(t, { x: x + 0.3, y: 2.44, w: 3.3, h: 0.36, isTextBox: true, margin: 0,
-      fontFace: B, fontSize: 15.5, bold: true, color: WHITE });
-    s.addText(d, { x: x + 0.3, y: 2.86, w: 3.3, h: 0.6, isTextBox: true, margin: 0,
-      fontFace: H, fontSize: 30, bold: true, color: "FF8A80" });
-    s.addText(x2, { x: x + 0.3, y: 3.56, w: 3.3, h: 1.7, isTextBox: true, margin: 0,
-      fontFace: B, fontSize: 12, color: FOG, lineSpacing: 15 });
+    s.addText(t, { x: x + 0.26, y: 2.42, w: 2.4, h: 0.36, isTextBox: true, margin: 0,
+      fontFace: B, fontSize: 14.5, bold: true, color: WHITE });
+    s.addText(d, { x: x + 0.26, y: 2.82, w: 2.4, h: 0.58, isTextBox: true, margin: 0,
+      fontFace: H, fontSize: 26, bold: true, color: "FF8A80" });
+    s.addText(x2, { x: x + 0.26, y: 3.48, w: 2.38, h: 1.82, isTextBox: true, margin: 0,
+      fontFace: B, fontSize: 11, color: FOG, lineSpacing: 14 });
   });
 
   s.addText("A feature with real lift against a random baseline can be worthless against a strong one.",
@@ -383,7 +384,7 @@ function card(s, x, y, w, h, fill = MIST) {
     ["$0.00", "model cost", "No API key, no tokens, no vendor account required to reproduce our score."],
     ["~18 s", "for 200 sessions", "About 90 ms per session, including a one-off 4.7 s index build. 0.41 GB peak."],
     ["0", "network calls", "Organiser policy may disable network at scoring. Our score is unaffected either way."],
-    ["21", "automated tests", "Including regression tests for both bugs that unit tests originally missed."],
+    ["24", "automated tests", "Including regressions for three bugs that unit tests alone did not catch."],
   ];
   items.forEach(([big, label, d], i) => {
     const x = M + (i % 2) * 6.25;
@@ -396,10 +397,10 @@ function card(s, x, y, w, h, fill = MIST) {
     s.addText(d, { x: x + 0.3, y: y + 1.14, w: 5.24, h: 0.74, isTextBox: true, margin: 0,
       fontFace: B, fontSize: 12.5, color: SLATE, lineSpacing: 15 });
   });
-  s.addText("Standard library only — retrieval runs on SQLite FTS5, entirely in memory. Anyone can clone the repo and reproduce 0.875866 in one command.",
+  s.addText("Hardened for the 800 unseen sessions: no crash on malformed profiles, empty, unicode or 54,000-character messages — and we found a latent bug where one quote character silently returned no results for a turn.",
     { x: M, y: 6.5, w: 12.1, h: 0.4, isTextBox: true, margin: 0,
       fontFace: B, fontSize: 13.5, italic: true, color: TEAL });
-  s.addNotes("Feasibility was a design constraint, not an afterthought. Zero cost, zero network, standard library only. The submission rules warn that network access may be disabled at scoring time — our score is identical either way.");
+  s.addNotes("Feasibility was a design constraint, not an afterthought. Zero cost, zero network, standard library only, and anyone can reproduce 0.875866 in one command. The rules warn network access may be disabled at scoring time; our score is identical either way. We also hardened against the 800 sessions we cannot see.");
 }
 
 /* ─── 11. Limitations ──────────────────────────────────────────────────── */

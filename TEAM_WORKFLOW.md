@@ -1,13 +1,13 @@
 # Team Workflow — Shopping Copilot (Track 4)
 
-4-person team. Goal: parallel work that doesn't collide, so the 72-hour
-window (Aug 29 12:00pm – Sep 1 12:00pm SGT) is spent building, not
-untangling merge conflicts or waiting on each other.
+4-person team. **This file describes what actually exists**, not the original
+plan — several planned components were measured and deliberately dropped, and
+crediting anyone with those would be wrong.
 
-## 1. Role split (mirrors PLAN.md's 5 systems + submission_rules.md's file layout)
+## 1. What is built
 
-The package below exists on `main`. ✅ = implemented and scoring,
-⬜ = still a stub raising `NotImplementedError`.
+✅ = implemented and scoring. ⬜ = a stub that raises `NotImplementedError`,
+kept only so the import surface is stable — **not a backlog**.
 
 ```
 agent.py                   ✅ thin glue: wires the pipeline, matches the contract
@@ -16,37 +16,41 @@ src/
   contracts.py             ✅ shared — Slots, SessionState, Candidate, RankedList
   catalog.py               ✅ shared — in-memory FTS5 index + precomputed attributes
   attributes.py            ✅ shared — attribute vocabulary mirrored from the evaluator
-  state.py                 ✅ P1 — slots, Intent Override, Boundary, question choice
-  intent.py                ✅ P1 — Buying/Browsing router + override detection
-  retrieval_filter.py      ✅ P2 — structured/attribute-match retrieval (Route A)
-  retrieval_dense.py       ⬜ P3 — embeddings (Route B) — deliberately unbuilt, see below
-  fusion_rerank.py         ⬜ P3 — fusion + LLM rerank — deliberately unbuilt, see below
-  personalization.py       ✅ P4 — long-term profile prior (tie-break only)
+  state.py                 ✅ slot accumulation, Intent Override, Boundary, question choice
+  intent.py                ✅ Buying/Browsing router + override detection
+  retrieval_filter.py      ✅ the retrieval and ranking route (the only one)
+  personalization.py       ✅ long-term profile prior, tie-break only
+  retrieval_dense.py       ⬜ embeddings — measured as unnecessary, never built
+  fusion_rerank.py         ⬜ fusion + LLM rerank — built, measured, rejected
 tests/test_pipeline.py     ✅ 24 tests, run with `python3 -m pytest tests/ -q`
 starter/agent.py           ✅ re-exports root agent.py so the evaluator runs unmodified
 starter/agent_bm25_baseline.py  the original weak baseline, preserved for comparison
 ```
 
-The two remaining stubs are **not a backlog**. Retrieval is saturated (197/200
-sessions hit; the 3 failures are ranking, not coverage), and an LLM reranker was
-built, measured and rejected in Phase 3.0 — it projected **-0.011**
-TechnicalScore because it demoted already-correct sessions. Do not implement
-either without new evidence; see `PLAN.md`.
+Why the two stubs stay empty: retrieval is saturated (197/200 sessions hit,
+and the 3 failures are ranking misses, not coverage misses), and the LLM
+reranker was built, measured at **-0.011**, and cut. Do not implement either
+without new evidence — see `PLAN.md`.
 
-`contracts.py`, `catalog.py` and `attributes.py` are **shared infrastructure**,
-not owned by one person — both retrieval routes need the same 50k-product
-index, and loading it twice would double startup and memory for nothing.
-Coordinate on a call before changing them.
+`contracts.py`, `catalog.py` and `attributes.py` are **shared infrastructure**
+rather than one person's file. Coordinate before changing them.
 
-| Person | Owns | Also responsible for |
+### Work areas, as they actually turned out
+
+The original P1-P4 split assumed dense retrieval and an LLM reranker were
+core. They are not, so the real work divided differently:
+
+| Area | Files | What it covers |
 |---|---|---|
-| **P1 — Dialog & Intent** | `state.py`, `intent.py` | clarification question generation, `ask_attribute` logic, the over-generality cutoff (turn budget discipline) |
-| **P2 — Filter Retrieval** | `retrieval_filter.py` | parsing category/material/color/size/style/brand/price out of accumulated slots into catalog filters |
-| **P3 — Dense Retrieval & Rerank** | `retrieval_dense.py`, `fusion_rerank.py` | picking + precomputing the embedding model (this is the one piece of prep work defensible *before* the window opens — see §4) |
-| **P4 — Personalization & Integration** | `personalization.py`, `agent.py` glue | wiring everyone's modules together, running `local_evaluator` after every merge, tracking per-scenario metrics, owning the submission checklist in PLAN.md |
+| **Dialogue** | `state.py`, `intent.py` | Slot accumulation, Intent Override retraction, Boundary handling, and which attribute to ask next |
+| **Retrieval & ranking** | `retrieval_filter.py`, `catalog.py`, `attributes.py` | The in-memory index, attribute extraction, and the scoring that decides the shortlist |
+| **Evaluation & experiments** | `scripts/`, `config.py` sweeps | Metric analysis, weight sweeps, the LLM rerank trial, and the robustness testing |
+| **Integration & submission** | `agent.py`, `tests/`, docs | API-contract conformance, the test suite, and the submission package |
 
-P4 is the integration point — give that person the least new-feature surface
-area so they have slack to review PRs and keep `main` green.
+**Fill in who did what before submitting** — the README's team-contributions
+table needs real names against real work. Do not credit anyone with
+`retrieval_dense.py` or `fusion_rerank.py`; a judge reading the repo will see
+they raise `NotImplementedError`.
 
 ## 2. The internal contract — DONE, now in code
 
