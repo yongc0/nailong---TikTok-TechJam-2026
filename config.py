@@ -53,6 +53,21 @@ ATTRIBUTE_PRIORITY = [
     "feature", "material", "color", "style", "size", "use_case",
 ]
 
+# Which attributes are worth asking about MORE THAN ONCE.
+#
+# The customer releases up to two constraints per question, so a second ask
+# only pays when a bucket holds three or more. Measured across the public
+# set, the share of sessions where a bucket holds 3+:
+#
+#   feature 20.5%   material 8.0%   colour 0.5%
+#   size 0.5%       style 0.0%      use_case 0.0%
+#
+# So re-asking colour, style, size or use_case is a wasted turn in ~99.5% of
+# sessions: the answer comes back "I don't have an additional preference",
+# which costs a turn against MTTC and teaches us nothing. Only feature and
+# material can realistically have more to give.
+REASK_ATTRIBUTES = {"feature", "material"}
+
 # --- Filter retrieval (retrieval_filter.py, P2) ---
 # How many keyword hits to rescore. Much wider than top_k on purpose: the
 # target often ranks poorly on raw BM25 but well once verified attribute

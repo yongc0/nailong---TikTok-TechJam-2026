@@ -197,3 +197,25 @@ def test_empty_profile_is_a_noop(catalog):
     order = [Candidate(parent_asin=f"A{i}", score=float(10 - i), source="filter") for i in range(5)]
     result = apply_profile_boost(RankedList(list(order)), {}, catalog)
     assert [c.parent_asin for c in result.candidates] == [c.parent_asin for c in order]
+
+
+def test_only_high_yield_attributes_are_re_asked():
+    """The customer releases at most two constraints per question, so a
+    second ask only pays where a bucket can hold three or more. Measured:
+    feature 20.5% of sessions, material 8.0%, and colour/style/size/use_case
+    at or below 0.5%. Re-asking the low-information four is a wasted turn."""
+    import config
+    state = _state()
+    # Exhaust the two re-askable buckets so the walk reaches colour.
+    state.disclosed_attributes.update({"feature", "material"})
+    assert choose_attribute_to_ask(state) == "color"
+
+    state.asked_attributes.add("color")
+    # colour has been asked once and is not re-askable, so move on.
+    assert choose_attribute_to_ask(state) == "style"
+
+    # feature and material, by contrast, survive having been asked.
+    fresh = _state()
+    fresh.asked_attributes.add("feature")
+    assert "feature" in config.REASK_ATTRIBUTES
+    assert choose_attribute_to_ask(fresh) == "feature"

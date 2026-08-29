@@ -259,6 +259,42 @@ private run on the paid tier is about $0.33 — the obstacle is that
 `docs/submission_rules.md` warns network access may be disabled at scoring
 time, so an LLM cannot sit on the scored path regardless.
 
+## Re-ask policy (Aug 26) — correct, and score-neutral
+
+Question: should every attribute be re-asked until exhausted, or only the
+ones that can actually hold more?
+
+The customer releases at most two constraints per question, so a second ask
+only pays where a bucket holds three or more. Measured share of sessions
+with 3+ constraints in a bucket:
+
+  feature 20.5%   material 8.0%   colour 0.5%
+  size 0.5%       style 0.0%      use_case 0.0%
+
+Tested four policies on all 200 sessions:
+
+| re-ask policy | score |
+|---|---|
+| all six attributes (previous behaviour) | 0.8759 |
+| **feature + material** | **0.8759** |
+| feature only | 0.8712 |
+| none — ask each once | 0.8738 |
+
+Restricting to feature + material is exactly neutral; cutting further hurts.
+So re-asking those two is load-bearing and re-asking the other four is not.
+
+**Why it is neutral rather than a gain:** instrumenting the runs shows the
+restriction never actually binds here. feature is asked 291 times (97
+repeats) and material 43 (16 repeats), but colour, style, size and use_case
+are asked 3-4 times each with **zero** repeats — sessions end (median: one
+question) long before the walk reaches them, and an unproductive ask retires
+the bucket in one turn anyway.
+
+Kept regardless, as documented policy rather than accident: it is provably
+free (a bucket with fewer than three constraints cannot reward a second
+ask), and it is insurance if private-set sessions run longer than public
+ones. `config.REASK_ATTRIBUTES`.
+
 ## What is left, in expected-value order
 
 Every priority in the earlier version of this section has now been done or

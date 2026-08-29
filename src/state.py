@@ -204,15 +204,23 @@ def choose_attribute_to_ask(state: SessionState) -> AttributeName | None:
     excludes the attributes that can never yield — budget, brand and
     category.
 
-    Asks the highest-yield bucket repeatedly until the customer says it is
-    empty, rather than moving on after one answer. Since a question costs
-    nothing when the recommendation already hits, re-asking a 96%-yield
-    attribute beats moving to a 4.5%-yield one. Termination is guaranteed:
-    an exhausted bucket returns "I don't have an additional preference for
-    X", which marks it settled.
+    Asks a high-yield bucket repeatedly until the customer says it is empty,
+    rather than moving on after one answer. Since a question costs nothing
+    when the recommendation already hits, re-asking a 96%-yield attribute
+    beats moving to a 4.5%-yield one. Termination is guaranteed: an
+    exhausted bucket returns "I don't have an additional preference for X",
+    which marks it settled.
+
+    Only config.REASK_ATTRIBUTES are asked more than once. The customer
+    releases at most two constraints per question, so a second ask can only
+    pay where a bucket holds three or more — true for feature (20.5% of
+    sessions) and material (8.0%), and essentially never for the rest.
     """
     for attribute in config.ATTRIBUTE_PRIORITY:
         if attribute in state.disclosed_attributes:
             continue  # customer explicitly has no preference here
+        if attribute in state.asked_attributes and attribute not in config.REASK_ATTRIBUTES:
+            # Asked once already, and this bucket is not worth a second ask.
+            continue
         return attribute  # type: ignore[return-value]
     return None
