@@ -120,6 +120,7 @@ def retrieve(
     disclosed_text: list[str] | None = None,
     extra_terms: list[str] | None = None,
     top_k: int = 50,
+    intent: str | None = None,
 ) -> list[Candidate]:
     """Return up to `top_k` candidates ranked by constraint satisfaction.
 
@@ -132,6 +133,12 @@ def retrieve(
             returns an empty list. Tokenised here, so callers may pass whole
             sentences safely.
         top_k: how many candidates to return.
+        intent: "buying" or "browsing" (or None). Nudges how hard coverage
+            and category agreement are trusted -- see
+            config.INTENT_COVERAGE_MULTIPLIER / INTENT_CATEGORY_MULTIPLIER.
+            A weighting adjustment only, never a hard gate: an unrecognised
+            or missing intent falls back to a neutral 1.0 multiplier, i.e.
+            today's behaviour.
     """
     terms = _query_terms(slots, disclosed_text)
     if not terms and extra_terms:
@@ -162,6 +169,12 @@ def retrieve(
     normalised = [phrase for phrase in normalised if phrase]
     category_tokens = tokenize(slots.category) if slots.category else []
 
+    # Intent nudges how hard we trust coverage/category agreement -- see
+    # config.py for the measured multipliers and the ablation that set them.
+    # .get(intent, 1.0) means an unknown or missing intent is a no-op.
+    coverage_weight = config.COVERAGE_WEIGHT * config.INTENT_COVERAGE_MULTIPLIER.get(intent, 1.0)
+    category_weight = config.CATEGORY_WEIGHT * config.INTENT_CATEGORY_MULTIPLIER.get(intent, 1.0)
+
     candidates: list[Candidate] = []
     for parent_asin, bm25_score in pool:
         matched = _matched_attributes(catalog, parent_asin, slots)
@@ -175,9 +188,9 @@ def retrieve(
         score = (
             keyword_strength
             + config.VERIFIED_MATCH_BONUS * len(matched)
-            + config.COVERAGE_WEIGHT * coverage
+            + coverage_weight * coverage
             + config.POPULARITY_WEIGHT * catalog.popularity.get(parent_asin, 0.0)
-            + config.CATEGORY_WEIGHT * _category_match(catalog, parent_asin, category_tokens)
+            + category_weight * _category_match(catalog, parent_asin, category_tokens)
         )
         candidates.append(Candidate(
             parent_asin=parent_asin,

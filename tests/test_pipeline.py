@@ -168,6 +168,39 @@ def test_missing_price_is_not_penalised(catalog):
     assert "budget" not in _matched_attributes(catalog, unpriced, Slots(budget=25.0))
 
 
+def test_intent_measurably_changes_retrieval_ranking(catalog):
+    """Buying/Browsing must be more than a label attached to state: it has
+    to change what the pipeline actually does (see PROJECT_REQUIREMENTS_
+    ALIGNMENT.md 4.1/4.2). A neutral/unknown intent must reproduce the old,
+    unweighted behaviour exactly, so this can never regress a session where
+    intent was never classified.
+
+    Browsing is deliberately left at the neutral 1.0 multiplier: measured
+    against the 200-session public set, raising it changed nothing (already
+    on the same wide plateau COVERAGE_WEIGHT/CATEGORY_WEIGHT sit on for
+    everyone) and lowering it cost real MRR (0.5907 -> 0.5865 at 0.3x). So
+    only Buying gets a real, verified-safe reweighting -- see config.py's
+    measured note for the full sweep."""
+    slots = Slots(category="boots", color="black", material="leather")
+    text = ["black leather boots", "waterproof", "under $80"]
+
+    neutral = retrieve(catalog, slots, disclosed_text=text, top_k=10, intent=None)
+    buying = retrieve(catalog, slots, disclosed_text=text, top_k=10, intent="buying")
+    browsing = retrieve(catalog, slots, disclosed_text=text, top_k=10, intent="browsing")
+    unknown = retrieve(catalog, slots, disclosed_text=text, top_k=10, intent="not-a-real-intent")
+
+    assert [c.parent_asin for c in neutral] == [c.parent_asin for c in unknown]
+    assert [c.score for c in buying] != [c.score for c in neutral]
+    # Browsing is an intentional no-op today -- see the docstring above.
+    assert [c.score for c in browsing] == [c.score for c in neutral]
+    # Buying leans harder into verified coverage/category agreement, so for
+    # any candidate present in both rankings its buying score is >= neutral.
+    neutral_scores = {c.parent_asin: c.score for c in neutral}
+    shared = [c for c in buying if c.parent_asin in neutral_scores]
+    assert shared
+    assert all(c.score >= neutral_scores[c.parent_asin] for c in shared)
+
+
 # --- personalization ------------------------------------------------------
 
 def test_profile_breaks_ties_without_overriding_real_evidence(catalog):

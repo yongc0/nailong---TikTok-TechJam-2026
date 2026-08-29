@@ -295,8 +295,16 @@ survive a distribution shift; sharp ones are usually fitted noise.
   the risk of a fitted model failing to transfer to the private set now rivals
   the upside. It is the right next experiment, but it must be judged on
   cross-validated evidence (GroupKFold by session), never on train-set gain.
-- **`intent.py` is built but barely load-bearing.** Intent is classified and
-  tracked, but does not yet change retrieval weighting between routes.
+- **`intent.py` now weights retrieval, and it is honestly close to
+  load-bearing too.** Buying leans harder on verified coverage/category
+  agreement than Browsing (`config.INTENT_COVERAGE_MULTIPLIER` /
+  `INTENT_CATEGORY_MULTIPLIER`). Swept the same way as every other knob
+  here: it changes individual candidate scores (see
+  `test_intent_measurably_changes_retrieval_ranking`) but not the public-set
+  TechnicalScore (0.875866, unchanged) -- both Buying and Browsing were
+  already at or near ceiling on the un-weighted formula, so there was
+  nothing left for this axis to win. We would rather report the honest null
+  than claim a lift we didn't measure; see `config.py` for the full sweep.
 - **Personalization is principled but worth almost nothing here (+0.0002,
   i.e. noise).** The profile is too coarse to separate candidates that
   already match the session constraints. It earns its place as correct

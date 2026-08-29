@@ -88,6 +88,7 @@ class Agent:
             disclosed_text=state.disclosed_text,
             extra_terms=[user_message],
             top_k=max(top_k, config.RERANK_CANDIDATE_POOL),
+            intent=state.intent,
         )
 
         # Confidence = how far the top candidate leads the shortlist. A

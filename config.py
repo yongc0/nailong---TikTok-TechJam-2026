@@ -125,6 +125,38 @@ CATEGORY_WEIGHT = 3.0
 # the fraction of the stated price still counted as a match.
 BUDGET_TOLERANCE = 0.35
 
+# Intent-conditioned retrieval weighting (state.py x retrieval_filter.py).
+#
+# Per the competition spec's own "Buying vs Browsing" framing: Buying
+# discloses a hard constraint early and should retrieve precisely; Browsing
+# opens vague and should keep the candidate pool diverse rather than
+# over-committing to one interpretation from thin evidence. Applied as small
+# multipliers on top of COVERAGE_WEIGHT / CATEGORY_WEIGHT above -- never a
+# separate scoring path or a hard gate -- so a misclassified turn only nudges
+# the ranking, exactly matching intent.py's own "weighting, not a gate"
+# design note. Neutral (1.0) is a no-op; see retrieve()'s intent parameter.
+#
+# SWEPT against the 200-session public set (python3 -m evaluator.local_evaluator):
+#   buying   0.9x/1.0x/1.15x/1.3x/1.5x/2.0x -> 0.875866, unchanged at every
+#            value tried. Buying sessions are already at ceiling (0.9875 Hit
+#            Rate) on the un-weighted formula; there is nothing left in this
+#            axis for Buying to win by trusting coverage/category harder.
+#   browsing 1.0x -> 1.3x -> 0.875866, unchanged (same wide plateau
+#            COVERAGE_WEIGHT/CATEGORY_WEIGHT already sit on for everyone).
+#            0.3x -> 0.875365, a real regression: browsing MRR fell
+#            0.590709 -> 0.586543 (Hit Rate and MTTC untouched -- it only
+#            reorders an already-correct top-10, never drops the target out).
+# Net finding: this axis cannot improve TechnicalScore in either direction
+# within a safe range -- the shared, un-weighted values were already correct
+# for both intents. Left at buying=1.3 (a real, verified-safe difference:
+# scores individual candidates differently, per
+# test_intent_measurably_changes_retrieval_ranking) and browsing=1.0 (an
+# intentional no-op -- lowering it only cost MRR, raising it did nothing).
+# This makes retrieval weights genuinely intent-conditioned, which is what
+# was missing before, without gambling any of the measured 0.875866.
+INTENT_COVERAGE_MULTIPLIER = {"buying": 1.3, "browsing": 1.0}
+INTENT_CATEGORY_MULTIPLIER = {"buying": 1.3, "browsing": 1.0}
+
 # --- Retrieval fusion (fusion_rerank.py, P3) ---
 FILTER_ROUTE_WEIGHT = 0.6
 DENSE_ROUTE_WEIGHT = 0.4
