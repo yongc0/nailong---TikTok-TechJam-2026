@@ -219,3 +219,30 @@ def test_only_high_yield_attributes_are_re_asked():
     fresh.asked_attributes.add("feature")
     assert "feature" in config.REASK_ATTRIBUTES
     assert choose_attribute_to_ask(fresh) == "feature"
+
+
+def test_unparseable_message_still_returns_candidates(catalog):
+    """A turn must never come back empty. The raw message is a last-resort
+    fallback when nothing parses, and it is tokenised — passed through raw it
+    becomes a single FTS phrase that matches nothing, and a message
+    containing a double quote makes the query malformed, which the error
+    handler turns into zero candidates."""
+    for message in [
+        'He said "nice" sneakers',        # quote breaks a raw FTS phrase
+        "'; DROP TABLE products; --",     # FTS/SQL syntax characters
+        "sneakers please",                # no category phrase to parse
+        "shoes " * 3000,                  # pathologically long
+    ]:
+        results = retrieve(catalog, Slots(), disclosed_text=[], extra_terms=[message], top_k=10)
+        assert results, f"no candidates for {message[:30]!r}"
+
+
+def test_fallback_does_not_pollute_a_parsed_query(catalog):
+    """When the dialogue has real constraints the raw message must be
+    ignored — using it unconditionally cost MRR (0.8759 -> 0.8743)."""
+    with_noise = retrieve(catalog, Slots(category="shorts"),
+                          disclosed_text=["100% Polyester"],
+                          extra_terms=["but I am still exploring blah"], top_k=10)
+    without = retrieve(catalog, Slots(category="shorts"),
+                       disclosed_text=["100% Polyester"], top_k=10)
+    assert [c.parent_asin for c in with_noise] == [c.parent_asin for c in without]

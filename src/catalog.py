@@ -54,6 +54,8 @@ def normalise(text: str) -> str:
 
 def tokenize(text: str) -> list[str]:
     """Lowercase content tokens, stopwords and 1-char tokens removed."""
+    # TOKEN_RE keeps only [a-z0-9]+, so quotes, asterisks, parentheses and
+    # the other characters FTS5 treats as syntax can never reach the query.
     return [
         token.lower()
         for token in TOKEN_RE.findall(text)

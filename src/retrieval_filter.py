@@ -127,13 +127,26 @@ def retrieve(
         catalog: the shared in-memory index.
         slots: accumulated structured constraints from the dialog.
         disclosed_text: raw constraint strings the shopper has revealed.
-        extra_terms: extra keywords (e.g. tokens from the current message),
-            used to widen the pool on turn 1 when little is known.
+        extra_terms: free text (e.g. the raw current message) used ONLY when
+            nothing could be parsed from the dialogue, so a turn never
+            returns an empty list. Tokenised here, so callers may pass whole
+            sentences safely.
         top_k: how many candidates to return.
     """
     terms = _query_terms(slots, disclosed_text)
-    if extra_terms:
-        terms.extend(extra_terms)
+    if not terms and extra_terms:
+        # LAST-RESORT fallback only, when nothing could be parsed from the
+        # message. Used unconditionally it measurably hurts: filler words
+        # ("still exploring") widen the pool and blur the ranking, costing
+        # MRR for no gain (0.8759 -> 0.8743). Used as a fallback it costs
+        # nothing and stops a turn returning an empty list.
+        #
+        # Tokenised, never passed through raw: an untokenised sentence
+        # becomes a single FTS phrase that matches nothing, and one
+        # containing a double quote makes the whole query malformed, which
+        # the error handler turns into zero candidates for that turn.
+        for text in extra_terms:
+            terms.extend(tokenize(str(text)))
     pool = catalog.search(terms, limit=config.POOL_SIZE)
     if not pool:
         return []

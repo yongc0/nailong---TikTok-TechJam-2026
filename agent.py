@@ -79,13 +79,14 @@ class Agent:
         update_slots(state, user_message)
         state.intent = classify_intent(user_message, state.intent)
 
-        # Tokens from the raw message widen the pool on turn 1, before much
-        # has been parsed into slots.
+        # The raw message is a fallback only: retrieve() uses it when nothing
+        # could be parsed from the dialogue, so a turn never comes back with
+        # an empty shortlist.
         candidates = retrieve(
             self.catalog,
             state.slots,
             disclosed_text=state.disclosed_text,
-            extra_terms=None if state.disclosed_text else [user_message],
+            extra_terms=[user_message],
             top_k=max(top_k, config.RERANK_CANDIDATE_POOL),
         )
 

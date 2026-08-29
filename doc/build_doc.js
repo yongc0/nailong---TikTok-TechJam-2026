@@ -283,6 +283,17 @@ body.push(p("Ordinary search engines reward repetition: a product description th
 body.push(p("We noticed that when the customer describes what they want, they use wording taken from the product's own description — we measured that 97 times out of 100, their exact words appear in the target product's text. So the right product is the one that satisfies every requirement, not the one that repeats one requirement loudest."));
 body.push(p("We changed the sorting to count how many of the customer's stated requirements each product genuinely meets. That was worth +0.046."));
 
+body.push(p("An example from our own test conversations. A shopper wants pyjamas, and across the conversation mentions four things: polyester; 95% polyester and 5% spandex; imported; and a button closure.", { after: 100 }));
+body.push(p("Before the change, the search favoured listings that talked most enthusiastically about pyjamas. Its top three were a bamboo pyjama set, a lace-hem set, and a tie-dye set. The correct product sat at position 23 — far outside the shortlist of ten, so that conversation was a guaranteed failure.", { after: 100 }));
+body.push(p("Those three results are not silly. They are all genuinely pyjamas, and one of them even has a button closure. But not one of them meets all four requirements: the bamboo set is not polyester, the lace-hem set has no button closure. They won on enthusiasm rather than on fit.", { after: 100 }));
+body.push(p("After the change, the ranking counts how many of the four requirements each product actually meets. The correct product — a satin striped pyjama set that meets all four — moves from 23rd place to 1st."));
+
+body.push(h2("Checking the product's category properly"));
+body.push(p("A product description mentions all sorts of things the product is not. A men's hoodie listing might mention women, or gifts, or matching items. Search the whole description and those passing mentions look like matches."));
+body.push(p("So this check ignores the description entirely and looks only at the shop's own filing label for the product — its category, such as “Novelty, Women, Hoodies”."));
+body.push(p("Again, a real example. A shopper asks for women's hoodies. Before this check, the top result was an ASPCA logo hoodie — a real hoodie, with a well-matching description, but filed under men's. The product the shopper actually wanted, filed under women's, was down at position 16. Adding the check moved it up to 8, and into the shortlist."));
+body.push(p("We should be honest about the size of this one. Across all 200 test conversations it improved the result in 3, made it worse in none, and changed nothing in the other 197. It earns its place because it never does harm and occasionally rescues a conversation — not because it is a major contributor.", { color: GREY }));
+
 body.push(h2("Favouring products people actually buy"));
 body.push(p("Products with more customer reviews have, by definition, been bought more often. Since we are trying to guess what someone bought, popularity is genuine evidence. Adding it was worth +0.069, our largest single ranking gain."));
 body.push(p("We should be straightforward about one thing here: this works partly because of how the competition selected its test cases. Every target is something a real customer really did buy. We have written this caveat into our project notes rather than leaving it unsaid.", { color: GREY }));
