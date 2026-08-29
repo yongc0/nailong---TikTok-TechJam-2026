@@ -66,10 +66,32 @@ recommending. The interesting problem is therefore not *when to ask* but
 (`config.CONFIDENT_MARGIN`).
 
 Because questions are free, we also **drain the highest-yield attribute before
-moving on** rather than asking each once. The customer releases at most two
-constraints per question and withholds the rest, so one answer does not empty
-a bucket — re-asking a 96%-yield attribute beats moving to a 4.5%-yield one.
-Treating a bucket as settled on first answer was costing us 0.17 TechnicalScore.
+moving on** rather than asking each once.
+
+Think of the shopper as holding a filing drawer per attribute — feature,
+material, colour, size, style, use case — and handing over **at most two items
+per question** before closing it. Our largest bug assumed one handover emptied
+the drawer, so the agent ticked the attribute off and moved on while half the
+information was still inside. A session opening with *"a key requirement is:
+Material:alloy"* (which classifies as `feature`) never asked `feature` again,
+and so never learned *"Triple Moon Pentagram Symbol"* — the phrase that
+actually identifies the product. Only an explicit refusal settles an attribute
+now. **Worth +0.166, our single largest fix.**
+
+Only `feature` and `material` are worth returning to: a second ask can only pay
+where a drawer holds three or more constraints, true for 20.5% and 8.0% of
+sessions respectively and at or below 0.5% for everything else
+(`config.REASK_ATTRIBUTES`). That restriction is score-neutral today — sessions
+end before the agent reaches the low-yield attributes — but it is provably free
+and it is insurance if private-set sessions run longer.
+
+**An Intent Override retracts one preference, not the whole conversation.**
+When the shopper says *"actually, ignore my earlier preference — what I need is
+canvas"*, they are withdrawing the single thing they opened with. Everything
+disclosed since still holds, and the product category has not changed. An
+earlier version wiped the entire session and forced the dialogue to restart,
+costing both Hit Rate and turns. Dropping only the first disclosed constraint
+lifted `intent_override` Hit Rate from 0.733 to 0.833.
 
 **2. Questions are ordered by measured yield, not intuition.** Classifying
 every public-set target's disclosable constraints through the evaluator's own
@@ -189,7 +211,7 @@ src/
   retrieval_dense.py         Route B — embedding retrieval (stub; see Limitations)
   fusion_rerank.py           route fusion + LLM rerank (stub; see Limitations)
   personalization.py         long-term profile prior, used as a tie-break
-tests/test_pipeline.py       21 unit tests for the above
+tests/test_pipeline.py       24 unit tests for the above
 scripts/test_groq.py         Groq connectivity smoke test
 scripts/validate_llm_rerank.py    Phase 3.0 experiment: LLM rerank vs ours
 scripts/analyse_llm_validation.py scores that experiment
@@ -219,6 +241,33 @@ session), including a one-off 4.7s index build; peak memory is 0.41 GB.
 This is a measured decision, not an omission: we tested the LLM stage and it
 made the ranking worse.
 
+## Robustness on data we cannot see
+
+The 200 public sessions are for development; scoring happens on 800 private
+sessions with different users and different target products. So we spent time
+on failure modes the public set never exercises.
+
+**A latent zero-results bug.** The raw user message reached the search engine
+untokenised, becoming a single quoted phrase that matched nothing (0 hits raw
+against 20 tokenised). Worse, a message containing a double quote made the
+query malformed, and the error handler turned that into **zero candidates for
+the entire turn**. The public set never triggers it; 800 unseen sessions might.
+It is now a last-resort fallback, tokenised, used only when nothing parses —
+score unchanged, and every degenerate input returns a full shortlist.
+
+**No crashes across malformed input**: empty, `None` and wrongly-typed
+profiles; empty and whitespace-only messages; unicode and emoji; FTS and SQL
+syntax characters; a 54,000-character message.
+
+**Sensitivity of our biggest assumption.** The popularity prior is the one
+place our ranking leans on how the benchmark was built. Swept for
+mis-tuning: weight 0.75 scores 0.8697, 1.5 (ours) 0.8759, 3.5 scores 0.8742 —
+a spread of 0.006 across a wide band. Being somewhat wrong costs little; only
+popularity carrying no signal at all in the private set would hurt (-0.066).
+
+**Every weight sits on a plateau, not a peak** — deliberately. Flat optima
+survive a distribution shift; sharp ones are usually fitted noise.
+
 ## Limitations and what we would improve
 
 - **An LLM reranking stage was tested and rejected on evidence.** On 40 real
@@ -235,6 +284,11 @@ made the ranking worse.
   the 3 that fail are ranking failures, not coverage failures — so a second
   retrieval route has almost nothing left to add. `retrieval_dense.py` and
   `fusion_rerank.py` remain stubs, deliberately.
+- **Title-weighted matching was tested and rejected.** Rewarding a constraint
+  found in the product title above one found anywhere in its text is
+  principled — a requirement in the title is what the product *is* — but it
+  hurt at every weight (0.876 → 0.854 at weight 3.0), because constraints are
+  drawn from the features and details fields rather than titles.
 - **A learned ranker (LTR) was scoped but not built.** The remaining +0.095 of
   headroom is all in MRR, which is what it would target. We stopped because
   with 197/200 sessions already hit and only 200 training sessions available,

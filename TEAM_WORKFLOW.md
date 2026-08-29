@@ -22,7 +22,7 @@ src/
   retrieval_dense.py       ⬜ P3 — embeddings (Route B) — deliberately unbuilt, see below
   fusion_rerank.py         ⬜ P3 — fusion + LLM rerank — deliberately unbuilt, see below
   personalization.py       ✅ P4 — long-term profile prior (tie-break only)
-tests/test_pipeline.py     ✅ 21 tests, run with `python3 -m pytest tests/ -q`
+tests/test_pipeline.py     ✅ 24 tests, run with `python3 -m pytest tests/ -q`
 starter/agent.py           ✅ re-exports root agent.py so the evaluator runs unmodified
 starter/agent_bm25_baseline.py  the original weak baseline, preserved for comparison
 ```
@@ -106,7 +106,7 @@ Full detail and the measurements behind the design are in `PLAN.md`.
    git-ignored, so it does **not** arrive with `git clone`.
 2. Run `python3 -m evaluator.local_evaluator` and confirm you get
    `0.875866`. If you get something else, say so before changing anything.
-3. Run `python3 -m pytest tests/ -q` — 21 tests should pass.
+3. Run `python3 -m pytest tests/ -q` — 24 tests should pass.
 4. **Read the measurements in `PLAN.md`** before proposing changes. Several
    are counter-intuitive and were expensive to discover: asking questions is
    free; `budget` and `brand` yield nothing; an LLM reranker makes things
@@ -133,8 +133,14 @@ sessions, so tuning against it risks fitting noise.
 
 **Ruled out, with evidence — please read before proposing these again:**
 LLM reranking (projected **-0.011**), additive personalization (**-0.036** at
-weight 1.0), and dense retrieval (retrieval is saturated). All three are
-documented with reproducible measurements in `PLAN.md`.
+weight 1.0), title-weighted matching (**-0.022** at weight 3.0), and dense
+retrieval (retrieval is saturated). All four are documented with
+reproducible measurements in `PLAN.md`.
+
+**Stop tuning against the 200.** We are at the point where further changes
+are more likely to be fitting noise than finding signal — `boundary`, with
+ten sessions, is the obvious trap. Remaining effort is better spent on
+robustness and the deliverables.
 
 **Config tuning is done** for every live knob; sweep results are recorded
 inline in `config.py`. The unswept knobs belong to the two stubs.

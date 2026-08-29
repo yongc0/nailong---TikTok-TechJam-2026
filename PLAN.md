@@ -49,7 +49,7 @@ updated" within the hacking window per the Devpost rules).
 - `starter/agent.py` now re-exports the root `agent.py`; the original weak
   baseline is preserved as `starter/agent_bm25_baseline.py`. The evaluator
   stays unmodified.
-- 21 tests pass: `python3 -m pytest tests/ -q`
+- 24 tests pass: `python3 -m pytest tests/ -q`
 
 Run it yourself (~18s, writes `results.json`):
 ```
@@ -294,6 +294,50 @@ Kept regardless, as documented policy rather than accident: it is provably
 free (a bucket with fewer than three constraints cannot reward a second
 ask), and it is insurance if private-set sessions run longer than public
 ones. `config.REASK_ATTRIBUTES`.
+
+## Robustness pass (Aug 26) — a latent zero-results bug
+
+Looking for further gains turned up a defect that the public set never
+triggers but 800 unseen sessions might.
+
+`agent.py` passed the raw user message into `retrieve()` as `extra_terms`,
+and it reached FTS untokenised. Two consequences:
+
+1. It became a single quoted PHRASE ("I am looking for shoes"), which
+   matches nothing — 0 hits raw against 20 tokenised. Removing it entirely
+   scored 0.8759, identical to leaving it in: pure dead weight.
+2. A message containing a DOUBLE QUOTE made the FTS expression malformed.
+   `catalog.search()` catches `OperationalError` and returns `[]`, so one
+   quote character silently zeroed out that entire turn.
+
+Naively tokenising fixes the fragility but costs score: filler words
+("still exploring") widen the pool and blur the ranking — hit rate rises
+0.985 -> 0.990 while MRR falls 0.670 -> 0.651, netting 0.8759 -> 0.8743.
+
+So `extra_terms` is now a LAST-RESORT fallback: used only when nothing could
+be parsed from the dialogue, and tokenised when used. Score stays exactly
+0.875866, and every degenerate input returns a full shortlist.
+
+Also verified no crash across: empty / None / wrongly-typed profiles, empty
+and whitespace-only messages, unicode and emoji, FTS and SQL syntax
+characters, and a 54,000-character message.
+
+### Tested and rejected: title-weighted matching
+
+Weighting a constraint found in the product TITLE above one found anywhere
+in its text. Principled — a requirement named in the title is what the
+product IS — but it hurt at every weight (0.8759 -> 0.8726 at 0.5,
+-> 0.8537 at 3.0), because constraints are drawn from the features and
+details fields, not titles. Reverted rather than left as dead config.
+
+### Private-set exposure: how much does the popularity prior have to be right?
+
+  weight 0.75 -> 0.8697    1.5 -> 0.8759 (ours)    3.5 -> 0.8742
+
+Anywhere in that range costs at most 0.006, so being mis-tuned for the
+private set is cheap. The only expensive case is popularity carrying no
+signal there at all, which would cost 0.066 — unlikely, since both sets are
+sampled the same way.
 
 ## What is left, in expected-value order
 
