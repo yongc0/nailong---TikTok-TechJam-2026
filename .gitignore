@@ -32,3 +32,10 @@ deck/*.pdf
 deck/photos/*.jpg
 deck/photos/*.jpeg
 deck/photos/*.png
+
+# Word doc build artefacts — rebuild with: cd doc && node build_doc.js
+doc/node_modules/
+doc/package-lock.json
+doc/package.json
+doc/page-*.jpg
+doc/*.pdf
