@@ -329,14 +329,16 @@ survive a distribution shift; sharp ones are usually fitted noise.
 
 ## Team contributions
 
-| Person | Ownership |
+| Team member | Contribution |
 |---|---|
-| P1 | Dialog state & intent — `state.py`, `intent.py` |
-| P2 | Filter retrieval — `retrieval_filter.py` |
-| P3 | Dense retrieval & rerank — `retrieval_dense.py`, `fusion_rerank.py` |
-| P4 | Personalization & integration — `personalization.py`, `agent.py`, evaluation |
+| Yong Chuan Onn | Software development and solution ideation |
+| Chew Qiao Enn | Software development and solution ideation |
+| Balon Alexandre Stephane Daniel | Solution ideation, product direction, and project review; demo video editing and scriptwriting |
+| Stella Teo Boon Yim | Solution ideation, product direction, and project review; demo video editing and scriptwriting |
 
-*To be completed with names and per-person detail before submission.*
+For the module-level breakdown used during parallel development, see
+`TEAM_WORKFLOW.md` (dialog state & intent, filter retrieval, dense
+retrieval & rerank, personalization & integration).
 
 ## Data source
 
