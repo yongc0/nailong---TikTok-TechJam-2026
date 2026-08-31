@@ -1,5 +1,5 @@
 """
-P4 — long-term profile signal (Pillar III: personalised context distillation).
+Long-term profile signal — personalised context, applied as a tie-break.
 
 The `user_profile` handed to `reset()` is the only long-term signal in the
 system: it describes what this shopper has cared about across PRIOR

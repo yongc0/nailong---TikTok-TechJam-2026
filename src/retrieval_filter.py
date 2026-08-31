@@ -1,5 +1,5 @@
 """
-P2 — Route A: structured/attribute-match retrieval ("filter track").
+Structured/attribute-match retrieval — the agent's only retrieval route.
 
 Retrieves a wide keyword pool from everything the shopper has disclosed, then
 rescores so products satisfying MORE of their stated constraints float up.

@@ -1,14 +1,16 @@
 """
-Shared in-memory catalog index — loaded ONCE, used by both retrieval routes.
+Shared in-memory catalog index — built ONCE per process, reused by every
+session.
 
-Shared infrastructure (like src/contracts.py), not owned by any single
-person: retrieval_filter.py (P2) and retrieval_dense.py (P3) both need the
-same 50k products, and loading the catalog twice would double both startup
-time and memory for no benefit.
+The index is immutable and carries no conversation state, so sharing it
+across sessions is safe under docs/final_evaluation_faq.md §5 ("teams may
+share immutable indexes, but conversational state must remain isolated
+between sessions").
 
 Keeps everything in-memory per the competition's "no external vector DB"
-constraint. The FTS5 index mirrors starter/agent.py's schema and BM25 field
-weights so the keyword route stays comparable to the published baseline.
+constraint. The FTS5 index mirrors starter/agent_bm25_baseline.py's schema
+and BM25 field weights so the keyword signal stays comparable to the
+published baseline.
 """
 from __future__ import annotations
 

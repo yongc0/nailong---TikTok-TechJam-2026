@@ -1,0 +1,12 @@
+# Optional — ONLY for the offline ablation scripts under scripts/.
+# Nothing here is imported by agent.py, src/, or the scored path, and
+# the submission reproduces its reported results without installing it.
+#
+#   scripts/validate_llm_rerank.py   the LLM-rerank experiment we ran and rejected
+#   scripts/analyse_llm_validation.py  scores that experiment's output
+#   scripts/test_groq.py             connectivity smoke test
+#
+# These call the Groq API and therefore need network access and a key:
+#   GROQ_API_KEY   copy .env.example to .env and fill it in (.env is gitignored)
+groq>=1.7.0
+python-dotenv>=1.0.0

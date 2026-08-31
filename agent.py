@@ -87,7 +87,7 @@ class Agent:
             state.slots,
             disclosed_text=state.disclosed_text,
             extra_terms=[user_message],
-            top_k=max(top_k, config.RERANK_CANDIDATE_POOL),
+            top_k=max(top_k, config.CANDIDATE_POOL_DEPTH),
             intent=state.intent,
         )
 

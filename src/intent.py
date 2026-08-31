@@ -1,15 +1,15 @@
 """
-P1 — Buying vs Browsing intent router.
+Buying vs Browsing intent router.
 
 Rule/keyword based, no LLM call: intent classification runs on every turn of
-every session, so putting an API call here would burn the Groq free-tier
-request budget (and add latency) on a decision that patterns handle well.
-LLM spend is reserved for the reranking stage, which is what actually drives
-MRR.
+every session, and patterns handle this decision well enough that an API
+call would only add latency, cost and a network dependency. Nothing on the
+scored path calls a model.
 
-Per PLAN.md system #1 this decides retrieval strategy WEIGHTING, not a hard
-gate — a misclassification should shift the blend between routes, never cut
-off a route entirely.
+This decides retrieval WEIGHTING, not a hard gate — a misclassified turn
+nudges how strongly coverage and category agreement are trusted (see
+config.INTENT_COVERAGE_MULTIPLIER) and can never cut a product out of
+contention.
 """
 from __future__ import annotations
 
@@ -78,8 +78,8 @@ def detect_override(user_message: str) -> bool:
     """True when the shopper is replacing an earlier preference rather than
     adding to it.
 
-    state.py uses this to decide between merging new slots and ERASING the
-    conflicting ones — see PLAN.md system #3's Intent Override handling.
+    state.py uses this to decide between merging new slots and retracting
+    the conflicting one — see update_slots()'s Intent Override branch.
     """
     return _count(OVERRIDE_PATTERNS, user_message) > 0
 

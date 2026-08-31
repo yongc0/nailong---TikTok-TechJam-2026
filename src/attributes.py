@@ -10,10 +10,11 @@ simulated customer will actually reveal. If our vocabulary diverges (e.g.
 we detect "beige" as a color but the simulator's COLOR_RE doesn't), we'll
 filter on signals the simulator never sends, and miss the ones it does.
 
-Do NOT edit evaluator/local_evaluator.py to "fix" this instead — per
-PLAN.md's submission checklist, evaluator files must not be modified. This
-module is our own hand-kept mirror; if the evaluator's vocabulary ever
-changes, update both.
+Do NOT edit evaluator/local_evaluator.py to "fix" this instead —
+docs/submission_rules.md forbids modifying evaluator files, and final
+results must come from the unmodified official evaluator. This module is
+our own hand-kept mirror; if the evaluator's vocabulary ever changes,
+update both.
 """
 from __future__ import annotations
 

@@ -1,16 +1,10 @@
-# Core (confirmed working, installed 2026-08-26)
-groq>=1.7.0
-python-dotenv>=1.0.0
-
-# The agent itself needs no third-party packages: retrieval runs on the
-# Python stdlib (sqlite3 FTS5) and everything stays in-memory. The two
-# above are only used by the optional LLM reranking stage, which is why
-# the offline fallback required by docs/submission_rules.md is viable.
-
-# Tests
+# Runtime dependencies of the submitted Agent: NONE.
+#
+# agent.py and everything under src/ import only the Python standard
+# library — retrieval runs on sqlite3's built-in FTS5 index and stays
+# in memory. The Agent makes no model calls and no network calls, so
+# there are no credentials to configure to reproduce our results.
+#
+# pytest is listed because the test suite is part of verifying the
+# submission, not because the Agent needs it at runtime.
 pytest>=8.0
-
-# Anticipated for dense retrieval (P3) — uncomment/pin once chosen & tested,
-# per TEAM_WORKFLOW.md: "everyone can append via PR"
-# sentence-transformers
-# numpy

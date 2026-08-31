@@ -1,6 +1,6 @@
 """
-P1 — dialog state machine: slot accumulation, Intent Override, Boundary
-handling, and the over-generality clarification trigger.
+Dialog state machine: slot accumulation, Intent Override, Boundary
+handling, and choosing which attribute to ask about next.
 
 The core job is extracting what the shopper reveals and never losing it.
 Measured on the public set: retrieving on the opening category alone puts

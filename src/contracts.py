@@ -1,17 +1,12 @@
 """
-Shared data shapes between pipeline modules.
+Shared data shapes passed between the pipeline modules.
 
-SCAFFOLDING ONLY — no business logic lives here. This exists so all 4 people
-can build state.py, intent.py, retrieval_filter.py, retrieval_dense.py,
-fusion_rerank.py, and personalization.py in parallel against a stable
-interface, per TEAM_WORKFLOW.md's file layout.
+No business logic lives here — these are the structures state.py,
+retrieval_filter.py and personalization.py hand to each other.
 
 Field names deliberately mirror docs/agent_api_contract.json's `ask_attribute`
-enum and `user_profile` shape, so nothing here should require translation at
-the agent.py boundary.
-
-NOTE: per TEAM_WORKFLOW.md §2, this is a *proposal* to react to on the
-pre-hacking group call, not a locked spec. Change freely before Aug 29.
+enum and `user_profile` shape, so nothing here needs translation at the
+agent.py boundary.
 """
 from __future__ import annotations
 
@@ -30,8 +25,7 @@ Intent = Literal["buying", "browsing"]
 class Slots:
     """Accumulated structured constraints extracted from the dialog so far.
 
-    Owned/mutated by state.py (P1). Read by retrieval_filter.py (P2),
-    retrieval_dense.py (P3), and personalization.py (P4).
+    Written by state.py; read by retrieval_filter.py.
     """
 
     category: Optional[str] = None
@@ -75,30 +69,28 @@ class SessionState:
     # wording itself is drawn from the target product's own listing.
     disclosed_text: list[str] = field(default_factory=list)
 
-    # parent_asins already shown and rejected/ignored by the user.
-    rejected_candidates: set[str] = field(default_factory=set)
-
-    # Raw turn-by-turn log (role, message) for LLM prompt context in
-    # fusion_rerank.py's reranking step.
+    # Turn-by-turn transcript of what the shopper said. Retained for
+    # debugging and for showing a full session in the demo; the scored
+    # path does not read it back.
     history: list[dict] = field(default_factory=list)
 
 
 @dataclass
 class Candidate:
-    """One retrieved product, pre- or post-fusion. `parent_asin` is the join
-    key against catalog.jsonl. Produced by retrieval_filter.py /
-    retrieval_dense.py, consumed by fusion_rerank.py / personalization.py.
+    """One retrieved product. `parent_asin` is the join key against
+    catalog.jsonl. Produced by retrieval_filter.py, consumed by
+    personalization.py and agent.py.
     """
 
     parent_asin: str
     score: float
-    source: Literal["filter", "dense"]
+    source: Literal["filter"] = "filter"
     matched_attributes: list[AttributeName] = field(default_factory=list)
 
 
 @dataclass
 class RankedList:
-    """Output of fusion_rerank.py; input+output of personalization.py."""
+    """A ranked shortlist: input and output of personalization.py."""
 
     candidates: list[Candidate]
 

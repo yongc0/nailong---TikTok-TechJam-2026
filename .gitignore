@@ -21,7 +21,9 @@ results/
 # Phase 3.0 experiment output — regenerate with scripts/validate_llm_rerank.py
 results_llm_validation.json
 
-# Presentation and write-up sources live outside the code submission.
-# Regenerate with: cd deck && node build_deck.js   |   cd doc && node build_doc.js
+# Presentation and write-up sources live outside the code submission and are
+# not tracked here. Their build scripts were removed from this tree along with
+# them; recover either from git history if needed:
+#   git log --all --oneline -- deck/ doc/
 deck/
 doc/

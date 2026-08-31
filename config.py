@@ -7,13 +7,12 @@ touching pipeline logic.
 
 Knobs marked SWEPT below have been tuned by coordinate descent against the
 200-session public set; the recorded numbers are their measured effect on
-TechnicalScore. Unmarked knobs belong to modules that are still stubs.
+TechnicalScore. Every knob in this file is live on the scored path, except
+the clearly marked GROQ_MODEL, which belongs to the optional offline
+experiment in scripts/validate_llm_rerank.py.
 """
 
-# --- Over-generality / clarification trigger (state.py, P1) ---
-CANDIDATE_POOL_TOO_LARGE = 50   # (reserved) pool breadth above which the result set counts as over-general
-MAX_CLARIFYING_TURNS = 4        # force a best-guess return after this many clarifying questions, well inside the 10-turn hard cap
-
+# --- Clarification policy (state.py) ---
 # Stop asking once the top candidate leads the shortlist by this margin
 # (0..1). Asking is free in this harness — the evaluator scores
 # recommendations before it reads ask_attribute — so the agent asks by
@@ -48,7 +47,8 @@ CONFIDENT_MARGIN = 0.35
 # category is disclosed for free in turn 1 by initial_message().
 # Every wasted question costs a turn against MTTC, so the zero-yield
 # attributes are excluded entirely rather than merely deprioritised.
-# Re-run tests/test_attribute_yield.py if the evaluator ever changes.
+# These shares were measured with the evaluator's own classify_constraint()
+# over the 200 public sessions; re-measure if the evaluator ever changes.
 ATTRIBUTE_PRIORITY = [
     "feature", "material", "color", "style", "size", "use_case",
 ]
@@ -157,28 +157,17 @@ BUDGET_TOLERANCE = 0.35
 INTENT_COVERAGE_MULTIPLIER = {"buying": 1.3, "browsing": 1.0}
 INTENT_CATEGORY_MULTIPLIER = {"buying": 1.3, "browsing": 1.0}
 
-# --- Retrieval fusion (fusion_rerank.py, P3) ---
-FILTER_ROUTE_WEIGHT = 0.6
-DENSE_ROUTE_WEIGHT = 0.4
-FUSION_METHOD = "rrf"           # "rrf" or "weighted_sum"
-RRF_K = 60
+# How deep a shortlist retrieve() returns per turn, independent of the
+# evaluator's top_k. Only the first top_k are ever recommended; the extra
+# depth exists so personalization can reorder ties over a real shortlist
+# rather than over an already-truncated 10.
+CANDIDATE_POOL_DEPTH = 30
 
-# --- Dense retrieval (retrieval_dense.py, P3) ---
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"  # local, in-memory — no external vector DB
-DENSE_TOP_K = 50
-
-# --- LLM calls (Groq) ---
+# --- Optional offline experiment only (scripts/validate_llm_rerank.py) ---
+# NOT on the scored path. The agent makes no model calls and imports no
+# third-party package; this is here so the rejected-LLM-rerank ablation
+# stays reproducible. See README's Limitations section for the result.
 GROQ_MODEL = "openai/gpt-oss-20b"
-
-# gpt-oss models spend completion tokens on an internal reasoning trace
-# before the final answer — cap too low and you get an empty reply.
-# Confirmed empirically: 20 tokens -> empty; 200 tokens -> reliable.
-RERANK_REASONING_EFFORT = "medium"   # ranking drives MRR (30% of score) — worth the extra reasoning
-RERANK_MAX_COMPLETION_TOKENS = 500
-RERANK_CANDIDATE_POOL = 30           # how many fused candidates to hand the LLM for final reranking
-
-CLARIFY_REASONING_EFFORT = "low"     # cheap classification/question-picking — don't overspend here
-CLARIFY_MAX_COMPLETION_TOKENS = 200
 
 # --- Personalization (personalization.py, P4) ---
 # Consult the long-term profile only to break ties in the session ranking,

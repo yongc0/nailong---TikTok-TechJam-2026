@@ -163,38 +163,99 @@ four fifths of it.
 
 ## Setup
 
-Python 3.10+. The agent itself needs **no third-party packages** — retrieval runs
-on the standard library (`sqlite3` FTS5) and stays entirely in memory.
+**Python 3.10.12** is what we measured on; any CPython **3.10+** works. The Agent
+imports **only the standard library** — retrieval runs on `sqlite3`'s built-in
+FTS5 index and stays in memory. There are no runtime dependencies and no
+credentials to configure.
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt          # pytest only, to run the test suite
+pip install -r requirements-dev.txt      # OPTIONAL: only for scripts/ ablations
 ```
 
-Download `catalog.jsonl.gz` from the participant-kit release, verify it, and
-place it:
+`requirements-dev.txt` (`groq`, `python-dotenv`) is needed **only** to re-run the
+rejected-LLM-rerank experiment under `scripts/`. It is not needed to reproduce
+any reported result. That experiment is the only thing that reads an environment
+variable:
+
+| Variable | Required for | Notes |
+|---|---|---|
+| `GROQ_API_KEY` | `scripts/validate_llm_rerank.py`, `scripts/test_groq.py` only | Copy `.env.example` to `.env` and fill it in; `.env` is git-ignored and no key is committed. Not required by the Agent or the evaluator. |
+
+### Catalog
+
+`data/catalog.jsonl` is git-ignored, so **every teammate must fetch it locally** —
+it does not arrive with `git clone`. Download `catalog.jsonl.gz` from the
+[participant-kit release](https://github.com/TechJam2026/techjam-conversational-search/releases/tag/participant-kit)
+into the repository root, then:
 
 ```bash
-shasum -a 256 -c SHA256SUMS
-gzip -dk catalog.jsonl.gz && mv catalog.jsonl data/catalog.jsonl
+# SHA256SUMS covers the COMPRESSED download, so verify before decompressing.
+shasum -a 256 -c SHA256SUMS          # expects catalog.jsonl.gz in the repo root
+gzip -dk catalog.jsonl.gz
+mv catalog.jsonl data/catalog.jsonl
 ```
 
-`data/catalog.jsonl` is git-ignored, so **every teammate must do this locally** —
-it does not arrive with `git clone`.
+Verify the decompressed file directly (this is the exact copy our results were
+produced from):
+
+```bash
+sha256sum data/catalog.jsonl
+# da979b05a68af864cb0dcf9ee6a81c010c7e66a57978ad286c7a2e005fc69a67
+wc -l data/catalog.jsonl        # 50000
+```
+
+| Artifact | SHA-256 | Size |
+|---|---|---|
+| `catalog.jsonl.gz` (as downloaded) | `07fd142631fd6b03e2b4d09988c3eb7d53720e9d57010c79db48eeaada50a8f8` | — |
+| `data/catalog.jsonl` (decompressed) | `da979b05a68af864cb0dcf9ee6a81c010c7e66a57978ad286c7a2e005fc69a67` | 60,546,327 bytes / 50,000 rows |
 
 ## Reproduce our results
 
 ```bash
-python3 -m evaluator.local_evaluator
+python3 -m evaluator.local_evaluator      # writes results.json
+python3 -m pytest tests/ -q               # 25 tests
 ```
 
-Runs all 200 public sessions in ~18s on a laptop and writes `results.json`.
-The printed `recommended_technical_score` should read `0.875866`.
+The printed `recommended_technical_score` must read **`0.875866`**.
 
-Run the tests:
+`docs/final_evaluation_faq.md` §1 requires teams to retain `results.json`
+together with the submitted commit hash and environment details, so record them
+in the same step:
 
 ```bash
-python3 -m pytest tests/ -q
+git rev-parse HEAD > results_commit.txt
+python3 -m evaluator.local_evaluator
+python3 -VV >> results_commit.txt
 ```
+
+### Exact environment these numbers came from
+
+| | |
+|---|---|
+| CPU | AMD Ryzen AI 7 350 (2 vCPU visible to the runner) |
+| RAM | 3.8 GiB available |
+| OS | Ubuntu 22.04.5 LTS, Linux 6.8.0-136 x86_64 |
+| Python | 3.10.12 (GCC 11.4.0), CPython |
+| Third-party packages on the scored path | none |
+
+| Measurement | Value | How it was measured |
+|---|---|---|
+| Wall clock, all 200 sessions | **18.0 s** | `time python3 -m evaluator.local_evaluator`, warm page cache |
+| One-off catalog index build | **6.2 s** | `time.perf_counter()` around `Catalog("data/catalog.jsonl")` |
+| Session work (18.0 s − index build) | **11.8 s** | derived |
+| Per session | **59 ms** | 11.8 s ÷ 200 sessions |
+| Per turn | **32 ms** | 11.8 s ÷ 372 turns actually executed |
+| Peak RSS, whole run | **638 MiB (0.62 GB)** | `/usr/bin/time -v`, "Maximum resident set size" |
+| RSS after index build alone | **410 MiB (0.40 GB)** | `resource.getrusage(RUSAGE_SELF).ru_maxrss` |
+| Prompt / completion tokens | **0 / 0** | no model is called |
+| Estimated model cost | **$0.00** | no model is called |
+
+Timings are hardware-dependent; the catalog index build dominates start-up and
+the per-turn cost is what scales with session count. Per
+`docs/final_evaluation_faq.md` §3 there is no organizer-imposed CPU, RAM or
+per-response limit, since teams run the final evaluation in their own
+environments.
 
 ## Repository layout
 
@@ -207,39 +268,71 @@ src/
   attributes.py              attribute vocabulary mirrored from the evaluator
   intent.py                  Buying/Browsing router + override detection
   state.py                   slot accumulation, override, boundary, question choice
-  retrieval_filter.py        Route A — attribute-match retrieval
-  retrieval_dense.py         Route B — embedding retrieval (stub; see Limitations)
-  fusion_rerank.py           route fusion + LLM rerank (stub; see Limitations)
+  retrieval_filter.py        attribute-match retrieval and ranking
   personalization.py         long-term profile prior, used as a tie-break
-tests/test_pipeline.py       24 unit tests for the above
-scripts/test_groq.py         Groq connectivity smoke test
-scripts/validate_llm_rerank.py    Phase 3.0 experiment: LLM rerank vs ours
+tests/test_pipeline.py       unit tests for the pipeline
+tests/test_evaluator.py      contract tests against the official evaluator
+scripts/validate_llm_rerank.py    the LLM-rerank experiment we ran and rejected
 scripts/analyse_llm_validation.py scores that experiment
+scripts/test_groq.py              Groq connectivity smoke test
 starter/agent_bm25_baseline.py    the original weak baseline, preserved
+docs/                             the organizer's participant kit, unmodified
 ```
+
+Every module listed under `src/` is on the scored path — there are no
+placeholder or unimplemented files in this tree. Earlier revisions carried
+`retrieval_dense.py` and `fusion_rerank.py` as stubs for a second retrieval
+route and an LLM reranker; both were measured, found unnecessary (see
+Limitations), and removed rather than shipped as dead scaffolding.
 
 `starter/agent.py` re-exports the root `agent.py` so
 `evaluator/local_evaluator.py` runs **unmodified** — modifying evaluator files is
 disallowed by `docs/submission_rules.md`.
 
-## Network access and offline fallback
+`docs/` is a verbatim copy of the organizer's participant kit, synced from
+[`TechJam2026/techjam-conversational-search`](https://github.com/TechJam2026/techjam-conversational-search)
+at upstream commit `9c9e7c9` (Track 4 final evaluation FAQ). The authoritative
+copies are the ones in that repository:
+[competition specification](https://github.com/TechJam2026/techjam-conversational-search/blob/main/docs/competition_specification.md) ·
+[agent API contract](https://github.com/TechJam2026/techjam-conversational-search/blob/main/docs/agent_api_contract.json) ·
+[submission rules](https://github.com/TechJam2026/techjam-conversational-search/blob/main/docs/submission_rules.md) ·
+[**final evaluation FAQ**](https://github.com/TechJam2026/techjam-conversational-search/blob/main/docs/final_evaluation_faq.md)
+
+### Development history
+
+`PLAN.md` and `TEAM_WORKFLOW.md` were internal planning documents used during
+the build. They went stale as the design changed and are not part of the
+submitted tree, but they are **not** erased: the full history, including every
+measurement we recorded as we went, is in git.
+
+```bash
+git log --all --oneline -- PLAN.md TEAM_WORKFLOW.md
+git show <commit>:PLAN.md
+```
+
+## Network access, models, and cost
 
 **The scored pipeline is fully offline and deterministic.** It makes no network
-calls, uses no external services, and needs no API key. If organizer policy
-disables network access at scoring time, the agent runs unchanged with identical
-results.
+calls, uses no external services, imports no third-party package, and needs no
+API key or credential of any kind. Reported token usage is `0 / 0` and estimated
+model cost is `$0.00`, because no model is ever called.
 
-`groq` and `python-dotenv` appear in `requirements.txt` only for the offline
-experiment in `scripts/validate_llm_rerank.py`, which measured an LLM reranker
-and found it net-negative (see Limitations). Nothing in the scored path imports
-them, and the agent runs unchanged if they are absent.
+To be clear about *why*: `docs/final_evaluation_faq.md` §2 allows network access
+and external APIs, and does **not** require an offline fallback. Running offline
+is therefore a deliberate engineering choice, not compliance with a restriction.
+We chose it because we measured the alternative and it lost — an LLM reranking
+stage scored **worse** than our ranker (see Limitations) — and because a
+submission with no credentials, no rate limits and no service dependency is one
+that reproduces identically for anyone who runs it, today or after the deadline.
 
-Token usage reported to the evaluator is `0`, and model cost is `$0`, because
-no model is called. Latency is ~18s for all 200 sessions end to end (~90ms per
-session), including a one-off 4.7s index build; peak memory is 0.41 GB.
+The only external dependency anywhere in this repository is the Groq API used by
+`scripts/validate_llm_rerank.py`, the experiment that produced that negative
+result. It is isolated in `requirements-dev.txt`, needs `GROQ_API_KEY`, and is
+never imported by `agent.py` or anything under `src/`. Deleting it entirely would
+not change a single reported number.
 
-This is a measured decision, not an omission: we tested the LLM stage and it
-made the ranking worse.
+Full latency, memory and cost measurements, with the method used for each, are
+in [Reproduce our results](#reproduce-our-results).
 
 ## Robustness on data we cannot see
 
@@ -282,8 +375,9 @@ survive a distribution shift; sharp ones are usually fitted noise.
   but the 1.7%-vs-85% measurement showed dialogue extraction mattered far more.
   Retrieval is now close to saturated — 197 of 200 sessions find the target, and
   the 3 that fail are ranking failures, not coverage failures — so a second
-  retrieval route has almost nothing left to add. `retrieval_dense.py` and
-  `fusion_rerank.py` remain stubs, deliberately.
+  retrieval route has almost nothing left to add. The `retrieval_dense.py` and
+  `fusion_rerank.py` stubs have been deleted rather than shipped as dead
+  scaffolding; the decision and its evidence live here instead.
 - **Title-weighted matching was tested and rejected.** Rewarding a constraint
   found in the product title above one found anywhere in its text is
   principled — a requirement in the title is what the product *is* — but it
@@ -336,9 +430,10 @@ survive a distribution shift; sharp ones are usually fitted noise.
 | Balon Alexandre Stephane Daniel | Solution ideation, product direction, and project review; demo video editing and scriptwriting |
 | Stella Teo Boon Yim | Solution ideation, product direction, and project review; demo video editing and scriptwriting |
 
-For the module-level breakdown used during parallel development, see
-`TEAM_WORKFLOW.md` (dialog state & intent, filter retrieval, dense
-retrieval & rerank, personalization & integration).
+Module ownership during the build: dialog state & intent (`state.py`,
+`intent.py`), retrieval & ranking (`catalog.py`, `retrieval_filter.py`,
+`attributes.py`), personalization & integration (`personalization.py`,
+`agent.py`, evaluation harness).
 
 ## Data source
 
