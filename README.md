@@ -229,6 +229,10 @@ python3 -m evaluator.local_evaluator
 python3 -VV >> results_commit.txt
 ```
 
+All numbers below were produced by the unmodified official evaluator at commit
+[`93530be`](https://github.com/yongc0/nailong---TikTok-TechJam-2026/commit/93530bec47a4020af05a7d241d84d3ea19be2d25)
+on a clean working tree.
+
 ### Exact environment these numbers came from
 
 | | |
